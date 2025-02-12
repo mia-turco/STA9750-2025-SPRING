@@ -1,11 +1,14 @@
 ---
 title: "Mia's personal website"
 ---
+
 Hello world, my name is Mia Turco and I am a grad student at Baruch College currently studying Quantitative Methods and Modeling. This website is currently being used for a project in STA9750.
 
 ```{r}
 #| include: false
 1+1
 ```
---------------
+
+------------------------------------------------------------------------
+
 Last Updated: `r format(Sys.time(), "%A %m %d, %Y at %H:%M%p")`
