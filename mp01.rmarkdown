@@ -1,0 +1,379 @@
+---
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Mini Project #01"
+  description:
+    Course Projects for STA 9750 at Baruch College
+  site-url: "https://mia-turco.github.io/STA9750-2025-SPRING/mp01.html"
+  navbar:
+    background: primary
+    search: false
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    theme: "flatly"
+---
+
+
+
+# Introduction
+
+This document presents an analysis of three proposed policies aimed at improving NYC payroll management. The goal is to assess the financial implications and recommend whether these policies should be adopted.
+
+# Background on NYC Payroll Structure
+
+Before diving into the policy analysis, it’s important to understand the structure of the payroll system in New York City. The payroll system of New York City is vast and complex and involves hundreds of thousands of employees in different agencies. Salaries are a function of union contracts, job classifications and length of service; but, overtime and pensions are paid on top of the basic salary to increase the overall cost. Some agencies, however, rely more on overtime because of staffing shortages, which increase spending. However, some high ranking employees earn more than the mayor and this has caused some concerns with regard to salary structures. Managing to give pay that is fair while also staying within a budget is a daily task and, therefore, payroll policies are central to cost saving efforts.
+
+
+
+```{r}
+if(!file.exists("data/mp01/nyc_payroll_export.csv")){
+    dir.create("data/mp01", showWarnings=FALSE, recursive=TRUE)
+    
+    ENDPOINT <- "https://data.cityofnewyork.us/resource/k397-673e.json"
+  
+  if(!require("httr2")) install.packages("httr2")
+  library(httr2)
+  
+  if(!require("jsonlite")) install.packages("jsonlite")
+  library(jsonlite)
+  
+  if(!require("dplyr")) install.packages("dplyr")
+  library(dplyr)
+  
+  if(!require("readr")) install.packages("readr")
+  library(readr)
+  
+  if (!require("DT")) install.packages('DT')
+  xfun::session_info('DT')
+  
+  BATCH_SIZE <- 50000
+  OFFSET     <- 0
+  END_OF_EXPORT <- FALSE
+  ALL_DATA <- list()
+  
+  while(!END_OF_EXPORT){
+    cat("Requesting items", OFFSET, "to", BATCH_SIZE + OFFSET, "\n")
+    
+    req <- request(ENDPOINT) |>
+      req_url_query(`$limit`  = BATCH_SIZE, 
+                    `$offset` = OFFSET)
+    
+    resp <- req_perform(req)
+    
+    batch_data <- fromJSON(resp_body_string(resp))
+    
+    ALL_DATA <- c(ALL_DATA, list(batch_data))
+    
+    if(NROW(batch_data) != BATCH_SIZE){
+      END_OF_EXPORT <- TRUE
+      
+      cat("End of Data Export Reached\n")
+    } else {
+      OFFSET <- OFFSET + BATCH_SIZE
+    }
+  }
+  
+  ALL_DATA <- bind_rows(ALL_DATA)
+  
+  cat("Data export complete:", NROW(ALL_DATA), "rows and", NCOL(ALL_DATA), "columns.")
+  
+  write_csv(ALL_DATA, "data/mp01/nyc_payroll_export.csv")
+}
+{
+  #loading all nessessary libraries
+  library(readr)
+  library(dplyr)
+  library(stringr)
+  library(DT)
+  library(scales)
+  
+  # renaming the csv file
+  payroll <- read_csv("data/mp01/nyc_payroll_export.csv")  
+  glimpse(payroll)
+  
+  # converting string columns to title case
+  payroll_title_case <- payroll |> 
+    mutate(agency_name = str_to_title(agency_name), 
+           first_name = str_to_title(first_name),
+           work_location_borough = str_to_title(work_location_borough),
+           title_description = str_to_title(title_description),
+           leave_status_as_of_june_30 = str_to_title(leave_status_as_of_june_30))
+  
+  glimpse(payroll_title_case)
+  
+  # reviewing Mayor Eric Adams' career
+  payroll_adams <- payroll_title_case  |> 
+    filter(first_name == "Eric", 
+           mid_init == "L", 
+           last_name == "ADAMS") |> 
+    group_by(fiscal_year, 
+             first_name, mid_init,
+             last_name,
+             title_description, 
+             agency_name) |> 
+    summarise(total_salary = sum(base_salary), .groups = "drop") |> 
+    arrange(fiscal_year) |> 
+    rename('Fiscal Year' = fiscal_year,
+           'First Name' = first_name,
+           'Middle Initial' = mid_init,
+           'Last Name' = last_name,
+           'Position' = title_description,
+           'Agency' = agency_name,
+           `Total Salary` = total_salary)
+  glimpse(payroll_adams)
+  # creating a payroll summary table
+  tbl_txt <- "Fiscal Year,Position,Agency,Total Salary
+2014,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,160000
+2015,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,160000
+2016,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2017,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2018,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2019,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2020,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2021,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2022,BOROUGH PRESIDENT,BOROUGH PRESIDENT-BROOKLYN,179200
+2022,MAYOR,OFFICE OF THE MAYOR,258750
+2023,MAYOR,OFFICE OF THE MAYOR,258750
+2024,MAYOR,OFFICE OF THE MAYOR,258750"
+  
+  payroll_summary <- read_csv(I(tbl_txt)) |> 
+    mutate(`Total Salary` = dollar(`Total Salary`))  
+  datatable(payroll_summary, 
+            class = DT:::DT2BSClass('display'),  
+            options = list(searching = FALSE, 
+                           paging = FALSE, 
+                           info = FALSE))
+  
+  # Creating an employee salary table
+  emp_payroll <- payroll_title_case |> 
+    mutate(total_comp = case_when(
+      pay_basis == 'per Annum' ~ base_salary,
+      pay_basis == 'per Hour' ~ base_salary * (regular_hours + ot_hours * 1.5),
+      pay_basis == 'per Day' ~ base_salary * (regular_hours / 7.5),
+    )) |> 
+    select(fiscal_year, first_name, mid_init, last_name, pay_basis, base_salary, regular_hours, total_comp, title_description, agency_name, work_location_borough, ot_hours)
+  
+  glimpse(emp_payroll)
+  
+  # which job title has the highest base rate of pay?
+  max_base_pay <- emp_payroll |>
+    group_by(title_description) |>
+    summarise(max = max(base_salary, na.rm = TRUE)) |>
+    arrange(desc(max)) |>
+    slice(1)
+  print(max_base_pay)
+  
+  # which individual & in what year had the single highest city total payroll?
+  highest_tot_payroll <- emp_payroll |>
+    filter(!is.na(first_name) & !is.na(last_name) & !is.na(total_comp)) |>
+    group_by(first_name, last_name, fiscal_year) |>
+    summarise(total_pay = sum(total_comp, na.rm = TRUE), .groups = "drop") |>
+    arrange(desc(total_pay)) |>
+    slice(1)
+  print(highest_tot_payroll)
+  
+  # which individual worked the most overtime hours?
+  most_ot_hrs <- emp_payroll |>
+    filter(!is.na(first_name) & !is.na(last_name) & !is.na(ot_hours)) |>
+    group_by(first_name, last_name) |>
+    summarise(total_ot_hours = sum(ot_hours, na.rm = TRUE), .groups = "drop") |>
+    arrange(desc(total_ot_hours)) |>
+    slice(1)
+  print(most_ot_hrs)
+  
+  # which agency has the highest avg total annual payroll?
+  highest_avg_agency_payroll <- emp_payroll |>
+    group_by(agency_name) |>
+    summarise(avg_payroll = mean(total_comp, na.rm = TRUE)) |>
+    arrange(desc(avg_payroll)) |>
+    slice(1)
+  print(highest_avg_agency_payroll)
+  
+  # which agency has the most employees on payroll in each year?
+  most_emp_per_agency <- emp_payroll |>
+    group_by(fiscal_year, agency_name) |>
+    summarise(emp_count = n_distinct(first_name, last_name),.groups = "drop") |>
+    arrange(fiscal_year, desc(emp_count)) |>
+    group_by(fiscal_year) |>
+    slice(1)
+  print(most_emp_per_agency) 
+  
+  # which agency has the highest overtime usage?
+  highest_ot_use <- emp_payroll |>
+    group_by(agency_name) |>
+    summarise(total_regular_hours = sum(regular_hours, na.rm = TRUE),
+      total_ot_hours = sum(ot_hours, na.rm = TRUE),
+      ot_ratio = total_ot_hours / total_regular_hours) |>
+    arrange(desc(ot_ratio)) |>
+    slice(1)
+  print(highest_ot_use)
+  
+  # what is the avg salary of employees who work outside the five boroughs?
+  avg_salary_outside_boroughs <- emp_payroll |>
+    filter(!work_location_borough %in% c("MANHATTAN", "BROOKLYN", "QUEENS", "BRONX", "STATEN ISLAND")) |>
+    summarise(avg_salary = mean(total_comp, na.rm = TRUE))
+  print(avg_salary_outside_boroughs)
+  
+  # how much has the city’s aggregate payroll grown over the past 10 years?
+  city_payroll_growth <- emp_payroll |>
+    group_by(fiscal_year) |>
+    summarise(total_payroll = sum(total_comp, na.rm = TRUE)) |>
+    filter(fiscal_year >= max(fiscal_year) - 10)  
+  
+  payroll_growth <- city_payroll_growth |>
+    summarise(
+      payroll_10_yrs_ago = total_payroll[fiscal_year == max(fiscal_year) - 10],
+      payroll_today = total_payroll[fiscal_year == max(fiscal_year)],
+      growth = payroll_today - payroll_10_yrs_ago)
+  print(payroll_growth) }
+```
+
+
+
+# Policy Analysis
+
+## Policy I: Capping Salaries at Mayoral Level
+
+### Overview
+
+This policy proposes capping salaries such that no city employee earns more than the mayor.
+
+
+
+```{r}
+overpaid_emp <- emp_payroll |>
+    left_join(payroll_adams, by = c("fiscal_year" = "Fiscal Year")) |>
+    filter(total_comp > `Total Salary`) |>
+    mutate(salary_cut = total_comp - `Total Salary`)
+  total_savings <- sum(overpaid_emp$salary_cut, na.rm = TRUE)
+  impact_summary <- overpaid_emp |>
+    group_by(Agency, Position) |>
+    summarise(num_affected = n(), 
+      total_salary_reduction = sum(salary_cut, na.rm = TRUE),  
+      .groups = "drop") |>
+    arrange(desc(total_salary_reduction))
+  datatable(impact_summary, 
+            class = DT:::DT2BSClass(c('compact', 'cell-border')),  
+            options = list(searching = FALSE, 
+                           paging = FALSE, 
+                           info = FALSE))
+```
+
+
+
+### Findings
+
+-   The greatest impact would be on the **Borough President’s Office** and the **Office of the Mayor**.
+-   **Potential Savings**: Several hundred million in pay roll cuts.
+
+------------------------------------------------------------------------
+
+## Policy II: Increasing Staffing to Reduce Overtime Expenses
+
+### Overview
+
+This policy aims to reduce the overtime premium by hiring additional employees.
+
+
+
+```{r}
+ ot_by_job <- emp_payroll |>
+    group_by(agency_name, title_description) |>
+    summarise(total_ot_hrs = sum(ot_hours, na.rm = TRUE), .groups = "drop")
+  ot_by_job <- ot_by_job |>
+    mutate(full_time_equ_emp = total_ot_hrs / 2000)
+  ot_by_job <- ot_by_job |>
+    left_join(emp_payroll |>
+                group_by(agency_name, title_description) |>
+                summarise(reg_salary = mean(base_salary, na.rm = TRUE), .groups = "drop"),
+              by = c("agency_name", "title_description")) |>
+    mutate(savings = total_ot_hrs * (1.5 * reg_salary - reg_salary))
+  savings_by_agency <- ot_by_job |>
+    group_by(agency_name) |>
+    summarise(aggregate_savings = sum(savings, na.rm = TRUE), .groups = "drop")
+  impact_summary <- ot_by_job |>
+    select(agency_name, 
+           title_description, 
+           total_ot_hrs,
+           full_time_equ_emp,
+           savings) |>
+    group_by(agency_name, title_description) |>
+    summarise(total_ot_hrs = sum(total_ot_hrs, na.rm = TRUE),
+              full_time_equ_emp = sum(full_time_equ_emp, na.rm = TRUE),
+              savings = sum(savings, na.rm = TRUE), .groups = "drop") |>
+    arrange(desc(savings))
+  library(DT)
+  datatable(impact_summary, 
+            class = DT:::DT2BSClass(c('compact', 'cell-border')),  
+            options = list(searching = FALSE, 
+                           paging = FALSE, 
+                           info = FALSE))
+  
+```
+
+
+
+### Findings
+
+-   Some agencies could see **significant savings** by increasing the number of employees they hire.
+-   Greatest potential for savings: **NYPD, FDNY, and Sanitation Department**.
+
+------------------------------------------------------------------------
+
+## Policy III: Limiting Overtime to 200 Hours Per Employee.
+
+### Overview
+
+This policy also sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.
+
+### Response:
+
+## Policy III: Limiting Overtime to 200 Hours Per Employee.
+
+### Overview
+
+This policy sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.
+
+
+
+```{r}
+ job_sharing_candidates <- emp_payroll |> 
+    mutate(ot_hours_cap = ifelse(ot_hours > 200, 200, ot_hours))
+  job_sharing_candidates <- job_sharing_candidates |> 
+    mutate(employees_needed = (ot_hours - ot_hours_cap) / 200)  
+  job_sharing_candidates <- job_sharing_candidates |> 
+    mutate(regular_rate = base_salary / 2000)  
+  job_sharing_candidates <- job_sharing_candidates |> 
+    mutate(savings = (ot_hours - ot_hours_cap) * regular_rate)
+  policy_impact_summary <- job_sharing_candidates |> 
+    group_by(agency_name, title_description) |> 
+    summarise(
+      total_savings = sum(savings, na.rm = TRUE), 
+      total_employees_needed = sum(employees_needed, na.rm = TRUE),
+      .groups = 'drop') |> 
+    arrange(desc(total_savings))
+  datatable(policy_impact_summary, 
+            class = DT:::DT2BSClass(c('compact', 'cell-border')),  
+            options = list(searching = FALSE, 
+                           paging = FALSE, 
+                           info = FALSE))
+```
+
+
+
+# Limitations & Assumptions
+
+1.  **Data Accuracy:** This analysis assumes that the payroll dataset is comprehensive and accurate. Missing or mistyped data can lead to wrong conclusions.
+2.  **Employee Behavior:** We assume that employees whose salary or overtime is capped will not try to increase their pay in other ways, for example, by changing their job titles.
+3.  **Feasibility of Hiring:** The analysis assumes that it is feasible to hire additional employees to work in place of overtime and that it is possible to fill the positions quickly.
+4.  **Fixed Work Hours:** The premise that 2000 hours of work per year is a full time workload and 200 hours is a reasonable cap may not be consistent with actual labor agreements.
+5.  **Financial Realities:** The possible savings calculations do not take into account the expenses that come with hiring and onboarding new employees.
+
+# Conclusion 
+Each of these policies has potential savings and implementation feasibility trade-offs. The CATS Commission should consider a phased approach to introducing salary caps and overtime reductions, while making sure that staffing levels do not decrease to a point where the levels of city services are compromised.
+
