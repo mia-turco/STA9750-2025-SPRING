@@ -1,6 +1,16 @@
 ---
-title: "mp01.qmd"
-author: "Mia Turco"
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "Mini Project #01"
+  description:
+    Course Projects for STA 9750 at Baruch College
+  site-url: "https://mia-turco.github.io/STA9750-2025-SPRING/mp01.html"
+  navbar:
+    background: primary
+    search: false
 output: 
   html_document:
     toc: true
@@ -346,4 +356,5 @@ This policy sets a cap on the number of overtime hours that an employee can work
 4.  **Fixed Work Hours:** The premise that 2000 hours of work per year is a full time workload and 200 hours is a reasonable cap may not be consistent with actual labor agreements.
 5.  **Financial Realities:** The possible savings calculations do not take into account the expenses that come with hiring and onboarding new employees.
 
-#Conclusion Each of these policies has potential savings and implementation feasibility trade-offs. The CATS Commission should consider a phased approach to introducing salary caps and overtime reductions, while making sure that staffing levels do not decrease to a point where the levels of city services are compromised.
+# Conclusion 
+Each of these policies has potential savings and implementation feasibility trade-offs. The CATS Commission should consider a phased approach to introducing salary caps and overtime reductions, while making sure that staffing levels do not decrease to a point where the levels of city services are compromised.
