@@ -1,0 +1,17 @@
+---
+title: "EIA Electricity Report"
+format: html
+execute:
+  echo: false
+editor:
+  markdown:
+    wrap: 72
+---
+
+```{r}
+if (file.exists("eia_report_code.R")) {
+  source("eia_report_code.R")
+} else {
+  message("The file 'eia_report_code.R' was not found.")
+}
+source("eia_report_code.R")
