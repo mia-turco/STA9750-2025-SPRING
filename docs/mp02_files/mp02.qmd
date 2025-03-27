@@ -11,7 +11,7 @@ editor:
   markdown:
     wrap: 72
 ---
-# The EIA Electricity Report
+# The EIA Electricity Report (unfinished!!)
 
 ## Task 1: Data Importation
 
