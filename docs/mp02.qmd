@@ -1,7 +1,13 @@
 ---
-title: "EIA Electricity Report"
+project:
+  type: website
+  output-dir: docs
+
+website:
+  title: "EIA Electricity Report"
+  site-url: "https://mia-turco.github.io/STA9750-2025-SPRING/mp02.html"
 format: 
-  html:
+  html: 
     theme: journal  
     toc: true       
     toc-depth: 2    
