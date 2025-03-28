@@ -1,9 +1,79 @@
 [
   {
+    "objectID": " mp01.html",
+    "href": " mp01.html",
+    "title": "Introduction",
+    "section": "",
+    "text": "This document presents an analysis of three proposed policies aimed at improving NYC payroll management. The goal is to assess the financial implications and recommend whether these policies should be adopted."
+  },
+  {
+    "objectID": " mp01.html#policy-i-capping-salaries-at-mayoral-level",
+    "href": " mp01.html#policy-i-capping-salaries-at-mayoral-level",
+    "title": "Introduction",
+    "section": "Policy I: Capping Salaries at Mayoral Level",
+    "text": "Policy I: Capping Salaries at Mayoral Level\n\nOverview\nThis policy proposes capping salaries such that no city employee earns more than the mayor.\n\noverpaid_emp &lt;- emp_payroll |&gt;\n    left_join(payroll_adams, by = c(\"fiscal_year\" = \"Fiscal Year\")) |&gt;\n    filter(total_comp &gt; `Total Salary`) |&gt;\n    mutate(salary_cut = total_comp - `Total Salary`)\n\nWarning in left_join(emp_payroll, payroll_adams, by = c(fiscal_year = \"Fiscal Year\")): Detected an unexpected many-to-many relationship between `x` and `y`.\nℹ Row 17197 of `x` matches multiple rows in `y`.\nℹ Row 12 of `y` matches multiple rows in `x`.\nℹ If a many-to-many relationship is expected, set `relationship =\n  \"many-to-many\"` to silence this warning.\n\n  total_savings &lt;- sum(overpaid_emp$salary_cut, na.rm = TRUE)\n  impact_summary &lt;- overpaid_emp |&gt;\n    group_by(Agency, Position) |&gt;\n    summarise(num_affected = n(), \n      total_salary_reduction = sum(salary_cut, na.rm = TRUE),  \n      .groups = \"drop\") |&gt;\n    arrange(desc(total_salary_reduction))\n  datatable(impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))\n\n\n\n\n\n\n\nFindings\n\nThe greatest impact would be on the Borough President’s Office and the Office of the Mayor.\nPotential Savings: Several hundred million in pay roll cuts."
+  },
+  {
+    "objectID": " mp01.html#policy-ii-increasing-staffing-to-reduce-overtime-expenses",
+    "href": " mp01.html#policy-ii-increasing-staffing-to-reduce-overtime-expenses",
+    "title": "Introduction",
+    "section": "Policy II: Increasing Staffing to Reduce Overtime Expenses",
+    "text": "Policy II: Increasing Staffing to Reduce Overtime Expenses\n\nOverview\nThis policy aims to reduce the overtime premium by hiring additional employees.\n\n ot_by_job &lt;- emp_payroll |&gt;\n    group_by(agency_name, title_description) |&gt;\n    summarise(total_ot_hrs = sum(ot_hours, na.rm = TRUE), .groups = \"drop\")\n  ot_by_job &lt;- ot_by_job |&gt;\n    mutate(full_time_equ_emp = total_ot_hrs / 2000)\n  ot_by_job &lt;- ot_by_job |&gt;\n    left_join(emp_payroll |&gt;\n                group_by(agency_name, title_description) |&gt;\n                summarise(reg_salary = mean(base_salary, na.rm = TRUE), .groups = \"drop\"),\n              by = c(\"agency_name\", \"title_description\")) |&gt;\n    mutate(savings = total_ot_hrs * (1.5 * reg_salary - reg_salary))\n  savings_by_agency &lt;- ot_by_job |&gt;\n    group_by(agency_name) |&gt;\n    summarise(aggregate_savings = sum(savings, na.rm = TRUE), .groups = \"drop\")\n  impact_summary &lt;- ot_by_job |&gt;\n    select(agency_name, \n           title_description, \n           total_ot_hrs,\n           full_time_equ_emp,\n           savings) |&gt;\n    group_by(agency_name, title_description) |&gt;\n    summarise(total_ot_hrs = sum(total_ot_hrs, na.rm = TRUE),\n              full_time_equ_emp = sum(full_time_equ_emp, na.rm = TRUE),\n              savings = sum(savings, na.rm = TRUE), .groups = \"drop\") |&gt;\n    arrange(desc(savings))\n  library(DT)\n  datatable(impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))\n\n\n\n\n\n\n\nFindings\n\nSome agencies could see significant savings by increasing the number of employees they hire.\nGreatest potential for savings: NYPD, FDNY, and Sanitation Department."
+  },
+  {
+    "objectID": " mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.",
+    "href": " mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.",
+    "title": "Introduction",
+    "section": "Policy III: Limiting Overtime to 200 Hours Per Employee.",
+    "text": "Policy III: Limiting Overtime to 200 Hours Per Employee.\n\nOverview\nThis policy also sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.\n\n\nResponse:"
+  },
+  {
+    "objectID": " mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.-1",
+    "href": " mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.-1",
+    "title": "Introduction",
+    "section": "Policy III: Limiting Overtime to 200 Hours Per Employee.",
+    "text": "Policy III: Limiting Overtime to 200 Hours Per Employee.\n\nOverview\nThis policy sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.\n\n job_sharing_candidates &lt;- emp_payroll |&gt; \n    mutate(ot_hours_cap = ifelse(ot_hours &gt; 200, 200, ot_hours))\n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(employees_needed = (ot_hours - ot_hours_cap) / 200)  \n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(regular_rate = base_salary / 2000)  \n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(savings = (ot_hours - ot_hours_cap) * regular_rate)\n  policy_impact_summary &lt;- job_sharing_candidates |&gt; \n    group_by(agency_name, title_description) |&gt; \n    summarise(\n      total_savings = sum(savings, na.rm = TRUE), \n      total_employees_needed = sum(employees_needed, na.rm = TRUE),\n      .groups = 'drop') |&gt; \n    arrange(desc(total_savings))\n  datatable(policy_impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))"
+  },
+  {
     "objectID": "index.html",
     "href": "index.html",
     "title": "Mia’s personal website",
     "section": "",
-    "text": "Hello world, my name is Mia Turco and I am a grad student at Baruch College currently studying Quantitative Methods and Modeling. This website is currently being used for a project in STA9750.\n\nLast Updated: Wednesday 02 12, 2025 at 12:33PM"
+    "text": "Hello world, my name is Mia Turco and I am a grad student at Baruch College currently studying Quantitative Methods and Modeling. This website is currently being used for a project in STA9750.\n\nLast Updated: Wednesday 03 05, 2025 at 19:40PM"
+  },
+  {
+    "objectID": "mp01.html",
+    "href": "mp01.html",
+    "title": "Introduction",
+    "section": "",
+    "text": "This document presents an analysis of three proposed policies aimed at improving NYC payroll management. The goal is to assess the financial implications and recommend whether these policies should be adopted."
+  },
+  {
+    "objectID": "mp01.html#policy-i-capping-salaries-at-mayoral-level",
+    "href": "mp01.html#policy-i-capping-salaries-at-mayoral-level",
+    "title": "Introduction",
+    "section": "Policy I: Capping Salaries at Mayoral Level",
+    "text": "Policy I: Capping Salaries at Mayoral Level\n\nOverview\nThis policy proposes capping salaries such that no city employee earns more than the mayor.\n\noverpaid_emp &lt;- emp_payroll |&gt;\n    left_join(payroll_adams, by = c(\"fiscal_year\" = \"Fiscal Year\")) |&gt;\n    filter(total_comp &gt; `Total Salary`) |&gt;\n    mutate(salary_cut = total_comp - `Total Salary`)\n\nWarning in left_join(emp_payroll, payroll_adams, by = c(fiscal_year = \"Fiscal Year\")): Detected an unexpected many-to-many relationship between `x` and `y`.\nℹ Row 17197 of `x` matches multiple rows in `y`.\nℹ Row 12 of `y` matches multiple rows in `x`.\nℹ If a many-to-many relationship is expected, set `relationship =\n  \"many-to-many\"` to silence this warning.\n\n  total_savings &lt;- sum(overpaid_emp$salary_cut, na.rm = TRUE)\n  impact_summary &lt;- overpaid_emp |&gt;\n    group_by(Agency, Position) |&gt;\n    summarise(num_affected = n(), \n      total_salary_reduction = sum(salary_cut, na.rm = TRUE),  \n      .groups = \"drop\") |&gt;\n    arrange(desc(total_salary_reduction))\n  datatable(impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))\n\n\n\n\n\n\n\nFindings\n\nThe greatest impact would be on the Borough President’s Office and the Office of the Mayor.\nPotential Savings: Several hundred million in pay roll cuts."
+  },
+  {
+    "objectID": "mp01.html#policy-ii-increasing-staffing-to-reduce-overtime-expenses",
+    "href": "mp01.html#policy-ii-increasing-staffing-to-reduce-overtime-expenses",
+    "title": "Introduction",
+    "section": "Policy II: Increasing Staffing to Reduce Overtime Expenses",
+    "text": "Policy II: Increasing Staffing to Reduce Overtime Expenses\n\nOverview\nThis policy aims to reduce the overtime premium by hiring additional employees.\n\n ot_by_job &lt;- emp_payroll |&gt;\n    group_by(agency_name, title_description) |&gt;\n    summarise(total_ot_hrs = sum(ot_hours, na.rm = TRUE), .groups = \"drop\")\n  ot_by_job &lt;- ot_by_job |&gt;\n    mutate(full_time_equ_emp = total_ot_hrs / 2000)\n  ot_by_job &lt;- ot_by_job |&gt;\n    left_join(emp_payroll |&gt;\n                group_by(agency_name, title_description) |&gt;\n                summarise(reg_salary = mean(base_salary, na.rm = TRUE), .groups = \"drop\"),\n              by = c(\"agency_name\", \"title_description\")) |&gt;\n    mutate(savings = total_ot_hrs * (1.5 * reg_salary - reg_salary))\n  savings_by_agency &lt;- ot_by_job |&gt;\n    group_by(agency_name) |&gt;\n    summarise(aggregate_savings = sum(savings, na.rm = TRUE), .groups = \"drop\")\n  impact_summary &lt;- ot_by_job |&gt;\n    select(agency_name, \n           title_description, \n           total_ot_hrs,\n           full_time_equ_emp,\n           savings) |&gt;\n    group_by(agency_name, title_description) |&gt;\n    summarise(total_ot_hrs = sum(total_ot_hrs, na.rm = TRUE),\n              full_time_equ_emp = sum(full_time_equ_emp, na.rm = TRUE),\n              savings = sum(savings, na.rm = TRUE), .groups = \"drop\") |&gt;\n    arrange(desc(savings))\n  library(DT)\n  datatable(impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))\n\n\n\n\n\n\n\nFindings\n\nSome agencies could see significant savings by increasing the number of employees they hire.\nGreatest potential for savings: NYPD, FDNY, and Sanitation Department."
+  },
+  {
+    "objectID": "mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.",
+    "href": "mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.",
+    "title": "Introduction",
+    "section": "Policy III: Limiting Overtime to 200 Hours Per Employee.",
+    "text": "Policy III: Limiting Overtime to 200 Hours Per Employee.\n\nOverview\nThis policy also sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.\n\n\nResponse:"
+  },
+  {
+    "objectID": "mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.-1",
+    "href": "mp01.html#policy-iii-limiting-overtime-to-200-hours-per-employee.-1",
+    "title": "Introduction",
+    "section": "Policy III: Limiting Overtime to 200 Hours Per Employee.",
+    "text": "Policy III: Limiting Overtime to 200 Hours Per Employee.\n\nOverview\nThis policy sets a cap on the number of overtime hours that an employee can work to help minimize payroll costs.\n\n job_sharing_candidates &lt;- emp_payroll |&gt; \n    mutate(ot_hours_cap = ifelse(ot_hours &gt; 200, 200, ot_hours))\n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(employees_needed = (ot_hours - ot_hours_cap) / 200)  \n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(regular_rate = base_salary / 2000)  \n  job_sharing_candidates &lt;- job_sharing_candidates |&gt; \n    mutate(savings = (ot_hours - ot_hours_cap) * regular_rate)\n  policy_impact_summary &lt;- job_sharing_candidates |&gt; \n    group_by(agency_name, title_description) |&gt; \n    summarise(\n      total_savings = sum(savings, na.rm = TRUE), \n      total_employees_needed = sum(employees_needed, na.rm = TRUE),\n      .groups = 'drop') |&gt; \n    arrange(desc(total_savings))\n  datatable(policy_impact_summary, \n            class = DT:::DT2BSClass(c('compact', 'cell-border')),  \n            options = list(searching = FALSE, \n                           paging = FALSE, \n                           info = FALSE))"
   }
 ]

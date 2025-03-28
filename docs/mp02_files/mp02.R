@@ -89,4 +89,11 @@ EIA_SEP_REPORT |>
          `Average Retail Price for 1000 kWh`=electricity_price_MWh, 
          `Total Generation Capacity (MWh)`= generation_MWh, 
          State=state) |>
+
   datatable()
+
+
+
+
+
+]
