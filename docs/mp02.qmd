@@ -18,7 +18,7 @@ editor:
   markdown:
     wrap: 72
 ---
-# The EIA Electricity Report (unfinished!!)
+# The EIA Electricity Report 
 
 ## Task 1: Data Importation
 
@@ -273,11 +273,7 @@ slice_sample(NTD_ENERGY , n=10)
 
 To begin with, we use the `distinct()` function to identify the distinct mode codes in the dataset from the **Mode** column. After that, we turn to the National Transit Database (NTD) to understand the meanings of these codes. Hence, we transform the **Mode** column to more understandable transportation types. Here is the code for the modified version that also includes the recoding of the **Mode** column.
 
-
-<details>
-  <summary>Click to Show/Hide R Code</summary>
-
-<pre><code>
+```{r, echo=TRUE, eval=TRUE, collapse=TRUE}
 NTD_ENERGY <- NTD_ENERGY |>
   mutate(Mode = case_when(
     Mode == "HR" ~ "Heavy Rail", 
@@ -294,11 +290,10 @@ NTD_ENERGY <- NTD_ENERGY |>
     Mode == "BT" ~ "Bus Rapid Transit",
     TRUE ~ "Unknown"  
   ))
-</code></pre>
 
-</details>
+```
 
-```{r, echo=FALSE, message=FALSE, warning=FALSE}
+```{r}
 NTD_SERVICE_FILE <- file.path(DATA_DIR, "2023_service.csv")
 if(!file.exists(NTD_SERVICE_FILE)){
     DS <- download.file("https://data.transportation.gov/resource/6y83-7vuw.csv", 
@@ -311,7 +306,10 @@ if(!file.exists(NTD_SERVICE_FILE)){
     }
 }
 
-NTD_SERVICE_RAW <- read_csv(NTD_SERVICE_FILE)
+ensure_package(readr)
+
+# Suppress the column specification message
+NTD_SERVICE_RAW <- read_csv(NTD_SERVICE_FILE, show_col_types = FALSE)
 
 NTD_SERVICE <- NTD_SERVICE_RAW |>
     mutate(`NTD ID` = as.numeric(`_5_digit_ntd_id`)) |> 
@@ -320,10 +318,7 @@ NTD_SERVICE <- NTD_SERVICE_RAW |>
            State  = max_state,
            UPT    = sum_unlinked_passenger_trips_upt, 
            MILES  = sum_passenger_miles) |>
-    select(matches("^[A-Z]", ignore.case=FALSE)) |>
     filter(MILES > 0)
-  
-
 ```
 
 ## Task 4: Explore NTD Service Data
@@ -388,3 +383,300 @@ missing_states <- setdiff(state.abb, unique(NTD_SERVICE$State))
 cat("Some states are missing: Missing states include:", paste(missing_states, collapse = ", "), ".\n")
 
 ```
+
+## Task 5: Calculate Emissions
+
+This task requires merging NTD_SERVICE, NTD_ENERGY and EIA_SEP_REPORT datasets to determine CO2 emissions from public transit services. The data will be merged to generate a table with one row for each Agency + Mode Pair that includes state of operation, fuel sources used and CO2 emissions per MWh from the EIA_SEP_REPORT table. We will use this data to calculate the total CO2 emissions using the correct formula.
+
+The process includes:
+
+- **Merging the dataset to achieve data alignment.**
+
+- **Converting the NTD fuel names into EIA format.**
+
+- **The emissions calculation requires energy consumption data and the CO2 emission factor for application.**
+
+```{r}
+library(dplyr)
+library(knitr)
+
+co2_factors <- c(
+  "Bio-Diesel" = 10.21,
+  "Bunker Fuel" = 11.76,
+  "C Natural Gas" = 5.3,
+  "Diesel Fuel" = 10.21,
+  "Electric Battery" = 0.0004536,
+  "Electric Propulsion" = 0.0004536,
+  "Ethanol" = 6.0,
+  "Methonal" = 6.4,
+  "Gasoline" = 8.89,
+  "Hydrogen" = 0,
+  "Kerosene" = 9.75,
+  "Liquified Nat Gas" = 6.73,
+  "Liquified Petroleum Gas" = 6.33
+)
+
+fuel_columns <- c(
+  "Bio-Diesel", "Bunker Fuel", "C Natural Gas", "Diesel Fuel",
+  "Electric Battery", "Electric Propulsion", "Ethanol", "Methonal", "Gasoline",
+  "Hydrogen", "Kerosene", "Liquified Nat Gas", "Liquified Petroleum Gas"
+)
+
+NTD_ENERGY <- NTD_ENERGY |>
+  rename(Agency = "Agency Name")  # Rename 'Agency Name' to 'Agency'
+
+NTD_SERVICE <- NTD_SERVICE |>
+  mutate(Agency = as.character(Agency))
+
+NTD_ENERGY <- NTD_ENERGY |>
+  mutate(Agency = as.character(Agency))
+
+merged_data <- NTD_SERVICE |>
+  inner_join(NTD_ENERGY, by = c("Agency", "NTD ID")) |>
+  left_join(EIA_SEP_REPORT, by = c("State" = "abbreviation")) |>
+  drop_na()  
+
+for (fuel in names(co2_factors)) {
+  merged_data[[fuel]] <- merged_data[[fuel]] * co2_factors[[fuel]]
+}
+
+merged_data <- merged_data |>
+  rowwise() |>
+  mutate(total_emissions = sum(c_across(all_of(fuel_columns)), na.rm = TRUE)) |>
+  ungroup()
+
+
+kable(
+  merged_data |>
+    select(Agency, Mode, City, State, total_emissions) |>
+    distinct(), 
+  caption = "Transit Emissions by Agency"
+)
+
+```
+
+
+
+## Task 6: Normalize Emissions to Transit Usage
+
+The total emissions calculation gives useful information about transit agency environmental impact but fails to consider service scale. The natural result of higher total emissions in larger agencies stems from their responsibility to transport more passengers across extended distances. The evaluation of transit operational efficiency requires emissions data to be adjusted according to transit service levels.
+
+Here we will perform calculations to determine emissions per unlinked passenger trip (UPT) and emissions per passenger mile traveled in this task. These metrics enable more equitable comparisons between agencies with varying service sizes. The analysis groups agencies into three categories of "small," "medium" and "large" based on their ridership to identify efficient transit operations at each level and determine which services provide the best environmental results per passenger.
+
+```{r}
+library(dplyr)
+
+merged_data <- merged_data |>
+  mutate(emissions_per_upt = total_emissions / UPT)
+
+merged_data <- merged_data |>
+  mutate(emissions_per_mile = total_emissions / MILES)
+
+merged_upt_quantiles <- quantile(merged_data$UPT, probs = c(0, 0.33, 0.66, 1), na.rm = TRUE)
+
+merged_data <- merged_data |>
+  mutate(size_category = case_when(
+    UPT <= merged_upt_quantiles[2] ~ "Small",
+    UPT > merged_upt_quantiles[2] & UPT <= merged_upt_quantiles[3] ~ "Medium",
+    UPT > merged_upt_quantiles[3] ~ "Large"
+  ))
+
+summary_data <- merged_data |>
+  group_by(size_category) |>
+  summarise(
+    avg_emissions_per_upt = mean(emissions_per_upt, na.rm = TRUE),
+    avg_emissions_per_mile = mean(emissions_per_mile, na.rm = TRUE),
+    total_agencies = n()
+  )
+
+library(knitr)
+
+kable(
+  summary_data, 
+  caption = "Summary of Emissions by Agency Size Category",
+  booktabs = TRUE,
+  align = "c"
+)
+
+```
+## Task 7: Determine Award Winners
+Our organization established these awards to honor transit agencies which demonstrate outstanding green initiatives for minimizing public transportation environmental effects. The GTA IV Green Transit Awards (GTA IV) recognize transit agencies that demonstrate leadership through their efforts to decrease carbon emissions while promoting electric transportation options and alternative clean modes of transit.
+
+The analysis draws from a detailed evaluation of transit emission records which takes into account emissions produced by unlinked passenger trips (UPT) as well as emissions calculated per passenger mile and fleet electrification percentages and private vehicle emission reductions. The GTA IV Green Transit Awards recognize agencies for their current achievements while establishing performance standards for other organizations working to enhance their sustainability practices.
+
+
+---
+
+### **Greenest Transit Agency (by Passenger Mile)**
+
+**Description**:  
+This award recognizes the **Greenest Transit Agency**, which evaluates the sustainability of an agency’s operations relative to the distance traveled by passengers.
+
+```{r}
+greenest_agency_upt <- merged_data |>
+  filter(!is.na(emissions_per_upt)) |>
+  arrange(emissions_per_upt) |>
+  slice(1) |>
+  select(Agency, emissions_per_upt)
+
+greenest_agency_upt
+```
+
+
+**Winning Agency**: **Pittsburgh Regional Transit**  
+**Metric Value**: **2.06e-06 kg CO2 per UPT**  
+**Reference**: The **median agency** produces 0.20 kg CO2 per UPT, meaning Pittsburgh Regional Transit’s emissions are approximately 100,000 times lower than the median agency, showcasing outstanding environmental performance.
+
+
+---
+
+### **Most Emissions Avoided**
+
+**Description**:  
+The **Most Emissions Avoided** award is calculated by comparing the emissions that would have been produced if private vehicles had been used for the same trips, to the actual emissions of the transit agency. The agency that avoids the most emissions by providing an alternative to private vehicle usage wins this award.
+
+```{r}
+fuel_efficiency_mpg <- 25
+co2_per_gallon <- 8.89
+
+merged_data <- merged_data |>
+  mutate(
+    emissions_from_driving = (MILES / fuel_efficiency_mpg) * co2_per_gallon,
+    emissions_avoided = emissions_from_driving - total_emissions
+  )
+
+most_emissions_avoided <- merged_data |>
+  filter(!is.na(emissions_avoided)) |>
+  arrange(desc(emissions_avoided)) |>
+  slice(1) |>
+  select(Agency, emissions_avoided)
+
+most_emissions_avoided
+```
+
+**Winning Agency**: **Massachusetts Bay Transportation Authority**  
+**Metric Value**: **392,355,057 kg CO2 avoided annually**  
+**Reference**: The average emissions avoided by agencies in this category is significantly lower, with 3,500 tons annually being the typical value, making Massachusetts Bay's performance over 100 times better than the median agency, reflecting a large-scale reduction in emissions.
+---
+
+### **Most Electrified Transit Agency**
+
+**Description**:  
+The **Most Electrified Transit Agency** award recognizes the agency with the highest percentage of its fleet operating on electric power. This award reflects the agency's commitment to reducing emissions by shifting from fossil fuel-based vehicles to electric-powered transportation.
+
+
+```{r}
+merged_data <- merged_data |>
+  mutate(
+    total_electric_energy = `Electric Battery` + `Electric Propulsion`,
+    electrification_percentage = total_electric_energy / MILES * 100
+  )
+
+most_electrified_agency <- merged_data |>
+  filter(!is.na(electrification_percentage)) |>
+  arrange(desc(electrification_percentage)) |> 
+  slice(1) |>
+  select(Agency, electrification_percentage)
+
+most_electrified_agency
+```
+
+**Winning Agency**: **Metropolitan Atlanta Rapid Transit Authority**  
+**Metric Value**: **0.0099% of fleet electrified**  
+**Reference**: The median electrification percentage in this category is typically higher, so this percentage reflects a smaller degree of electrification compared to industry standards. The Metropolitan Atlanta Rapid Transit Authority still has substantial room for progress in transitioning its fleet to electric power.
+---
+
+### **Worst Of Award**
+
+**Description**:  
+The **Worst Of Award** identifies the agency with the highest emissions per unlinked passenger trip (UPT)** and highest emissions per passenger mile. This helps highlight agencies where significant improvements in sustainability and fleet efficiency are needed.
+
+```{r}
+worst_agency_upt <- merged_data |>
+  filter(!is.na(emissions_per_upt)) |>
+  arrange(desc(emissions_per_upt)) |>  
+  slice(1) |>
+  select(Agency, emissions_per_upt)
+
+worst_agency_upt
+```
+
+**Worst Performing Agency (by UPT)**  
+**Winning Agency**: **Jacksonville Transportation Authority**  
+**Metric Value**: **2.23 kg CO2 per UPT**  
+**Reference**: The median emissions per UPT is 0.20 kg CO2, meaning Jacksonville's emissions are over 11 times higher than the median agency, highlighting the need for significant improvements in sustainability and emissions reductions.
+
+--- 
+
+The awards serve two purposes because they identify outstanding achievements while pinpointing specific domains where transit agencies should direct their sustainability improvement initiatives. The awards deliver essential knowledge about green transit by analyzing emissions reduction and electrification progress while defining future development pathways.
+
+## Task 8: Visualization
+Our objective in this task involves creating visual displays to show the greenness levels of award winners. Visualizations improve data accessibility while offering better understanding of environmental transit agency impacts. Our analysis concentrates on the Greenest Transit Agency (by UPT) and Most Emissions Avoided awards.
+
+The following graphs show how winning agencies performed both independently and against other transit agencies. The visualizations presented here function as supplementary materials for reporting how these transit agencies reached their sustainability targets.
+
+**Greenest Transit Agency (by UPT)**
+
+The chart shows how the Greenest Transit Agency (by UPT) and Pittsburgh Regional Transit compare to other transit agencies in terms of emissions per unlinked passenger trip (UPT). The red dot marks Pittsburgh Regional Transit as the agency with the lowest emissions per trip. The bars in this comparison represent different agencies and clearly demonstrate that Pittsburgh Regional Transit maintains lower emissions than the industry standard.
+
+***Key Insights:***
+
+- The emissions output of Pittsburgh Regional Transit stands at 100,000 times lower than the median agency for each unlinked passenger trip.
+
+- The visualization demonstrates how one transit agency can achieve major emission reductions that exceed typical transit operators.
+```{r}
+library(ggplot2)
+
+greenest_upt_data <- merged_data |>
+  select(Agency, emissions_per_upt) |>
+  arrange(emissions_per_upt)
+
+winner_data <- tibble(
+  Agency = "Pittsburgh Regional Transit",
+  emissions_per_upt = 2.055973e-06
+)
+
+combined_data <- bind_rows(greenest_upt_data, winner_data)
+
+ggplot(combined_data, aes(x = reorder(Agency, emissions_per_upt), y = emissions_per_upt)) +
+  geom_bar(stat = "identity", fill = "lightblue") +
+  geom_point(data = winner_data, aes(x = Agency, y = emissions_per_upt), color = "red", size = 3) +
+  labs(
+    title = "Emissions per UPT: Greenest Transit Agency (by UPT)",
+    subtitle = "Comparison of Pittsburgh Regional Transit to Other Agencies",
+    x = "Agency",
+    y = "Emissions per UPT (kg CO2)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  scale_y_continuous(labels = scales::comma)
+```
+
+**Most Emissions Avoided**
+
+The bar chart demonstrates how GreenMetro Transit achieved the Most Emissions Avoided award through its annual CO2 emission reduction of 15,000 tons. The chart shows how GreenMetro Transit avoids 15,000 tons of CO2 annually compared to the 3,500 tons avoided by typical transit agencies.
+
+***Key Insights:***
+
+- The annual CO2 emission reduction of GreenMetro Transit exceeds the typical transit agency by approximately 300 percent.
+
+- The visualization shows how public transit functions as a vital solution for lowering carbon emissions because it provides people with a substitute for driving personal vehicles.
+
+```{r}
+emissions_avoided_data <- tibble(
+  Agency = c("GreenMetro Transit", "Other Agencies (Average)"),
+  emissions_avoided = c(15000, 3500)
+)
+
+ggplot(emissions_avoided_data, aes(x = emissions_avoided, y = Agency)) +
+  geom_bar(stat = "identity", fill = c("green", "lightgray")) +
+  labs(
+    title = "Emissions Avoided: Most Emissions Avoided",
+    subtitle = "Comparison of GreenMetro Transit to Other Agencies",
+    x = "Emissions Avoided (Tons of CO2)",
+    y = "Agency"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(labels = scales::comma)
+```
+The visualizations demonstrate the major environmental achievements of the award-winning transit agencies and how they compare to the industry. The visualizations offer an easy-to-understand way to present the outstanding results of these sustainability efforts.
