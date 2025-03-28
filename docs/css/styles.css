@@ -1,0 +1,67 @@
+/* Custom styles for journal theme */
+
+/* Adjust the body font */
+body {
+  font-family: 'Arial', sans-serif;
+  background-color: #f7f7f7;
+  color: #333;
+}
+
+/* Change the color of links */
+a {
+  color: #007bff;
+}
+
+a:hover {
+  color: #0056b3;
+}
+
+/* Change header colors */
+h1, h2, h3 {
+  color: #003366;
+}
+
+/* Navbar adjustments */
+.navbar {
+  background-color: #003366;
+}
+
+.navbar a {
+  color: white;
+}
+
+.navbar a:hover {
+  color: #f0f0f0;
+}
+
+/* Customizing the footer */
+.footer {
+  background-color: #003366;
+  color: white;
+}
+
+.footer a {
+  color: #f0f0f0;
+}
+
+.footer a:hover {
+  color: #d6d6d6;
+}
+body {
+  font-family: 'Roboto', sans-serif;
+  background-color: #f4f7f9;
+}
+
+h1, h2, h3 {
+  color: #212529;
+  font-family: 'Georgia', serif;
+}
+
+/* Adjusting link colors */
+a {
+  color: #3498db;
+}
+
+a:hover {
+  color: #2980b9;
+}

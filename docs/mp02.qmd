@@ -10,7 +10,8 @@ format:
   html: 
     theme: journal  
     toc: true       
-    toc-depth: 2    
+    toc-depth: 2  
+    css: "css/styles.css"  
 execute:
   echo: false       
 editor:
@@ -115,17 +116,17 @@ ensure_package(scales)
 ensure_package(DT)
 
 EIA_SEP_REPORT |> 
-  select(-abbreviation) |>
-  arrange(desc(CO2_MWh)) |>
-  mutate(CO2_MWh = number(CO2_MWh, big.mark=","), 
-         electricity_price_MWh = dollar(electricity_price_MWh), 
-         generation_MWh = number(generation_MWh, big.mark=",")) |>
-  rename(`Pounds of CO2 Emitted per MWh of Electricity Produced`=CO2_MWh, 
-         `Primary Source of Electricity Generation`=primary_source, 
-         `Average Retail Price for 1000 kWh`=electricity_price_MWh, 
-         `Total Generation Capacity (MWh)`= generation_MWh, 
-         State=state) |>
-  datatable()
+    select(-abbreviation) |>
+    arrange(desc(CO2_MWh)) |>
+    mutate(CO2_MWh = number(CO2_MWh, big.mark=","), 
+           electricity_price_MWh = dollar(electricity_price_MWh), 
+           generation_MWh = number(generation_MWh, big.mark=",")) |>
+    rename(`Pounds of CO2 Emitted per MWh of Electricity Produced`=CO2_MWh, 
+           `Primary Source of Electricity Generation`=primary_source, 
+           `Average Retail Price for 1000 kWh`=electricity_price_MWh, 
+           `Total Generation Capacity (MWh)`= generation_MWh, 
+           State=state) |>
+    datatable()
 ```
 As we can see, since our table has redered the appropriate information, we can conclude that the data has been properly imported and can now begin our analysis.
 
@@ -237,6 +238,8 @@ if(!file.exists(NTD_ENERGY_FILE)){
     }
 }
 
+library(readr)
+library(dplyr)     
 NTD_ENERGY_RAW <- read_xlsx(NTD_ENERGY_FILE)
 
 ensure_package(tidyr)
@@ -274,7 +277,7 @@ To begin with, we use the `distinct()` function to identify the distinct mode co
 <details>
   <summary>Click to Show/Hide R Code</summary>
 
-```{r,eval=FALSE}
+<pre><code>
 NTD_ENERGY <- NTD_ENERGY |>
   mutate(Mode = case_when(
     Mode == "HR" ~ "Heavy Rail", 
@@ -291,5 +294,97 @@ NTD_ENERGY <- NTD_ENERGY |>
     Mode == "BT" ~ "Bus Rapid Transit",
     TRUE ~ "Unknown"  
   ))
-```
+</code></pre>
+
 </details>
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+NTD_SERVICE_FILE <- file.path(DATA_DIR, "2023_service.csv")
+if(!file.exists(NTD_SERVICE_FILE)){
+    DS <- download.file("https://data.transportation.gov/resource/6y83-7vuw.csv", 
+                  destfile=NTD_SERVICE_FILE, 
+                  method="curl")
+    
+    if(DS | (file.info(NTD_SERVICE_FILE)$size == 0)){
+        cat("I was unable to download the NTD Service File. Please try again.\n")
+        stop("Download failed")
+    }
+}
+
+NTD_SERVICE_RAW <- read_csv(NTD_SERVICE_FILE)
+
+NTD_SERVICE <- NTD_SERVICE_RAW |>
+    mutate(`NTD ID` = as.numeric(`_5_digit_ntd_id`)) |> 
+    rename(Agency = agency, 
+           City   = max_city, 
+           State  = max_state,
+           UPT    = sum_unlinked_passenger_trips_upt, 
+           MILES  = sum_passenger_miles) |>
+    select(matches("^[A-Z]", ignore.case=FALSE)) |>
+    filter(MILES > 0)
+  
+
+```
+
+## Task 4: Explore NTD Service Data
+
+Using the NTD_Service Data, we are able to solve for the following questions:
+
+**Which transit service has the most UPT annually?**
+```{r}
+most_upt_service <- NTD_SERVICE |> 
+  group_by(Agency) |> 
+  summarise(total_upt = sum(UPT, na.rm = TRUE)) |> 
+  arrange(desc(total_upt)) |> 
+  slice(1)
+
+cat("The transit service with the most UPT annually is:", most_upt_service$Agency, "with", most_upt_service$total_upt, "UPT.")
+```
+
+**What is the average trip length of a trip on MTA NYC?**
+```{r}
+library(dplyr)
+library(stringr)
+mta_nyc_filtered <- NTD_SERVICE |>
+  filter(str_detect(City, "New York") & str_detect(Agency, "MTA")) |>
+  filter(!is.na(MILES) & !is.na(UPT) & MILES > 0 & UPT > 0)
+
+mta_nyc_avg_trip_len <- mta_nyc_filtered |>
+  summarise(avg_trip_len = mean(MILES / UPT, na.rm = TRUE))
+
+cat("The average trip length for MTA NYC is:", round(mta_nyc_avg_trip_len$avg_trip_len, 2), "miles.")
+```
+
+**Which transit service in NYC has the longest average trip length?**
+```{r}
+longest_avg_trip <- NTD_SERVICE |> 
+  filter(str_detect(City, "New York")) |>  
+  filter(!is.na(MILES) & !is.na(UPT) & MILES > 0 & UPT > 0) |>  
+  group_by(Agency) |> 
+  summarise(avg_trip_len = mean(MILES / UPT, na.rm = TRUE)) |> 
+  arrange(desc(avg_trip_len)) |> 
+  slice(1)
+
+cat("The transit service in NYC with the longest average trip length is:", longest_avg_trip$Agency, "with an average trip length of", round(longest_avg_trip$avg_trip_len, 2), "miles.")
+```
+
+**Which state has the fewest total miles travelled by public transit?**
+```{r}
+few_mi_st <- NTD_SERVICE |> 
+  group_by(State) |> 
+  summarise(total_miles = sum(MILES, na.rm = TRUE)) |> 
+  arrange(total_miles) |> 
+  slice(1)
+
+cat("The state with the fewest total miles travelled by public transit is:", few_mi_st$State, "with", few_mi_st$total_miles, "miles.")
+```
+
+**Are all states represented in this data?**
+```{r}
+NTD_SERVICE <- NTD_SERVICE |>
+  mutate(State = toupper(State))  
+missing_states <- setdiff(state.abb, unique(NTD_SERVICE$State))
+
+cat("Some states are missing: Missing states include:", paste(missing_states, collapse = ", "), ".\n")
+
+```
