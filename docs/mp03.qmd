@@ -1,0 +1,699 @@
+---
+title: "MP03: Spotify Song Analytics"
+project:
+  type: website
+
+website:
+  title: "The Ultimate Playlist"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Home
+      - href: mp03.qmd
+        text: MP03
+
+format:
+  html:
+    theme: yeti
+    toc: true
+    css: styles.css
+---
+
+
+## Overview
+
+This mini-project investigates Spotify song characteristics to discover which elements make tracks popular. We start by analyzing both the structure and variables within the dataset.
+In this mini-project, we’ll explore Spotify song characteristics and playlists using two external datasets mirrored from GitHub. We’ll begin by downloading and preparing the song data, followed by extracting and cleaning playlist-level information.
+
+---
+
+```{r setup-libs, include=FALSE}
+# Load required libraries
+library(jsonlite)
+library(readr)
+library(purrr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+```
+
+```{r load-songs-function, include=FALSE}
+# Task 1: Song Characteristics Dataset
+
+load_songs <- function() {
+  DATA_DIR <- "data/mp03"
+  SONGS_FILE <- file.path(DATA_DIR, "spotify_songs.csv")
+  SONGS_URL <- "https://raw.githubusercontent.com/gabminamedez/spotify-data/refs/heads/master/data.csv"
+
+  if (!dir.exists(DATA_DIR)) {
+    dir.create(DATA_DIR, recursive = TRUE)
+  }
+
+  if (!file.exists(SONGS_FILE)) {
+    download.file(SONGS_URL, destfile = SONGS_FILE, method = "auto")
+  }
+
+  songs <- read_csv(SONGS_FILE)
+  return(songs)
+}
+```
+
+```{r load-songs-data, include=FALSE}
+spotify_songs <- load_songs()
+```
+
+```{r clean-artists, include=FALSE}
+clean_artist_str <- function(x){
+  str_replace_all(x, "\\['", "") |>
+    str_replace_all("'\\]", "") |>
+    str_replace_all("'", "") |>
+    str_trim()
+}
+
+spotify_artists <- spotify_songs |>
+  separate_longer_delim(artists, ",") |>
+  mutate(artist = clean_artist_str(artists)) |>
+  select(-artists)
+```
+
+```{r load-playlists-function, include=FALSE}
+# Task 2: Playlist Dataset
+
+load_pl <- function() {
+  DATA_DIR <- "data/mp03/playlists"
+  BASE_URL <- "https://raw.githubusercontent.com/DevinOgrady/spotify_million_playlist_dataset/master/data1/"
+  FILE_NAME <- "mpd.slice.0-999.json"
+  FILE_PATH <- file.path(DATA_DIR, FILE_NAME)
+  FILE_URL <- paste0(BASE_URL, FILE_NAME)
+
+  if (!dir.exists(DATA_DIR)) {
+    dir.create(DATA_DIR, recursive = TRUE)
+  }
+
+  if (!file.exists(FILE_PATH)) {
+    download.file(FILE_URL, destfile = FILE_PATH, method = "auto")
+  }
+
+  data <- fromJSON(FILE_PATH, simplifyVector = FALSE)  
+
+  if (!"playlists" %in% names(data)) return(NULL)
+
+  pl_tracks <- map_dfr(data$playlists, function(pl) {
+    if (!is.list(pl)) return(NULL)
+    if (!("tracks" %in% names(pl))) return(NULL)
+    if (!is.list(pl$tracks) || length(pl$tracks) == 0) return(NULL)
+
+    track_df <- tryCatch(
+      bind_rows(pl$tracks),
+      error = function(e) NULL
+    )
+
+    if (is.null(track_df) || nrow(track_df) == 0) return(NULL)
+
+    track_df |>
+      mutate(
+        playlist_name      = pl$name,
+        playlist_id        = pl$pid,
+        playlist_followers = pl$num_followers,
+        playlist_position  = row_number()
+      ) |>
+      select(
+        playlist_name,
+        playlist_id,
+        playlist_followers,
+        playlist_position,
+        track_name,
+        track_uri,
+        artist_name,
+        artist_uri,
+        album_name,
+        album_uri,
+        duration_ms
+      ) |>
+      rename(
+        track_id  = track_uri,
+        artist_id = artist_uri,
+        album_id  = album_uri,
+        duration  = duration_ms
+      )
+  })
+
+  return(pl_tracks)
+}
+```
+
+
+```{r load-playlist-data, include=FALSE}
+pl_data <- load_pl()
+```
+
+```{r strip-prefix-function, include=FALSE}
+# Task 3: Rectangle the Playlist Data
+strip_spotify_prefix <- function(x) {
+  stringr::str_replace(x, ".*:.*:", "")
+}
+```
+
+```{r rectangle-playlist-data, include=FALSE}
+
+pl_rect <- pl_data |>
+  mutate(
+    artist_id = strip_spotify_prefix(artist_id),
+    track_id  = strip_spotify_prefix(track_id),
+    album_id  = strip_spotify_prefix(album_id)
+  ) |>
+  select(
+    playlist_name,
+    playlist_id,
+    playlist_position,
+    playlist_followers,
+    artist_name,
+    artist_id,
+    track_name,
+    track_id,
+    album_name,
+    album_id,
+    duration
+  )
+```
+
+## Initial Exploration
+
+Let's examine the data scope before moving forward with detailed analysis. The dataset contains what total number of distinct songs and artists? Which specific tracks appear most frequently across playlists? Do any playlists or songs stand out from the rest as unexpected discoveries?
+
+The questions guide us to understand our data as both numerical information and as evidence of how listeners behave and cultural patterns evolve.
+
+---
+
+### 1. How many distinct tracks and artists are represented in the playlist data?
+
+```{r distinct-counts, echo=FALSE}
+n_dist_tracks <- pl_rect |> distinct(track_id) |> nrow()
+n_dist_artists <- pl_rect |> distinct(artist_id) |> nrow()
+
+tibble(
+  "Distinct Tracks" = n_dist_tracks,
+  "Distinct Artist" = n_dist_artists
+)
+```
+
+The number of unique tracks is 34443 and the number of unique artists is 9754. This gives us an idea of how diverse the content is.
+---
+
+### 2. What are the 5 most popular tracks in the playlist data?
+
+```{r top-tracks, echo=FALSE}
+top_tracks <- pl_rect |>
+  count(track_name, sort = TRUE) |>
+  slice_max(n, n = 5)
+
+top_tracks
+```
+
+The five most frequently appearing tracks in playlists are shown above. They may not be current hits, but they represent what was most frequently added at the time the data was collected.
+
+---
+
+### 3. What is the most popular track in the playlist data that does *not* have a corresponding entry in the song characteristics data?
+
+```{r unmatched-track, echo=FALSE}
+spotify_songs <- spotify_songs |>
+  mutate(track_id = stringr::str_replace(id, ".*:.*:", ""))
+unmatched_tracks <- pl_rect |>
+  anti_join(spotify_songs, by = "track_id") |>
+  count(track_name, sort = TRUE)
+
+top_unmatched <- unmatched_tracks |> slice(1)
+
+top_unmatched
+```
+
+The track "One Dance" appears frequently in playlists yet fails to appear in the song analytics dataset which suggests a possible time difference between dataset exports.
+
+---
+
+### 4. According to the song characteristics data, what is the most “danceable” track? How often does it appear in a playlist?
+
+```{r top-danceable, echo=FALSE}
+most_dance <- spotify_songs |>
+  filter(!is.na(danceability)) |>
+  slice_max(danceability, n = 1)
+
+dance_count <- pl_rect |>
+  filter(track_id == most_dance$track_id) |>
+  nrow()
+
+most_dance |>
+  select(name, artists, danceability) |>
+  mutate(playlist_appearances = dance_count)
+```
+
+The tool reveals the most popular danceable track to be "Funky Cold Medina" along with its playlist frequency which links track-level analytics to actual playlist behavior.
+
+---
+
+### 5. Which playlist has the longest average track length?
+
+```{r longest-playlist, echo=FALSE}
+pl_longest_avg <- pl_rect |>
+  group_by(playlist_id, playlist_name) |>
+  summarise(avg_duration = mean(duration, na.rm = TRUE), .groups = "drop") |>
+  slice_max(avg_duration, n = 1)
+
+pl_longest_avg
+```
+
+The classical playlist seems to prefer longer songs, which is typical of the genre.
+
+
+---
+
+### 6. What is the most popular playlist on Spotify?
+
+```{r most-followed-playlist, echo=FALSE}
+most_followed <- pl_rect |>
+  distinct(playlist_id, playlist_name, playlist_followers) |>
+  slice_max(playlist_followers, n = 1)
+
+most_followed
+```
+
+The playlist with the highest follower count in the dataset is "Tangled".
+
+```{r join-data, include=FALSE}
+analysis_data <- pl_rect |>
+  inner_join(spotify_songs |> mutate(track_id = stringr::str_replace(id, ".*:.*:", "")), 
+             by = "track_id")
+```
+
+## Identifying Characteristics of Popular Songs
+
+We have examined which songs and artists appear in the data so we will now examine the features that determine popularity. What characteristics make a song more likely to be included in playlists? Do popular tracks tend to have specific features such as danceability, key or track length?
+
+These questions will be answered by a set of visualizations that show patterns in tracks, release years and musical traits.
+
+---
+
+### 1. Is the popularity column correlated with the number of playlist appearances? 
+The popularity score of each track on Spotify ranges from 0 to 100 and depends on streaming numbers and recent activity along with other engagement metrics. The graph shows popularity ratings against playlist occurrence frequency for each song.
+
+```{r popularity-vs-appearances, echo=FALSE, message=FALSE}
+library(ggplot2)
+
+pop_vs_appearance <- analysis_data |>
+  count(track_id, popularity, name, sort = TRUE)
+
+ggplot(pop_vs_appearance, aes(x = n, y = popularity)) +
+  geom_point(alpha = 0.4, color = "#2c3e50") +
+  labs(
+    title = "Popularity vs. Playlist Appearances",
+    x = "Playlist Appearances",
+    y = "Spotify Popularity Score"
+  ) +
+  theme_minimal()
+```
+
+The analysis reveals a weak positive pattern between playlist inclusion frequency and popularity scores yet numerous popular songs fail to appear in playlists.
+
+---
+
+### 2. In what year were the most popular songs released?
+Do listeners mostly listen to new songs or do they stick to older hits? 
+```{r most-popular-years, echo=FALSE}
+pop_songs <- analysis_data |>
+  filter(popularity >= 75)  
+
+ggplot(pop_songs, aes(x = year)) +
+  geom_bar(fill = "#1DB954") +
+  labs(
+    title = "Release Years vs Popularity",
+    x = "Year",
+    y = "Number of Popular Tracks"
+  ) +
+  theme_minimal()
+```
+Our results imply that the most popular songs were released in the 20th century.
+
+---
+
+### 3. In what year did danceability peak?
+
+We will calculate the average danceability score by release year to see when "dancability" peaked.
+```{r danceability-by-year, echo=FALSE}
+ggplot(analysis_data, aes(x = year, y = danceability)) +
+  stat_summary(fun = mean, geom = "line", color = "#ff6f61", linewidth = 1) +
+  labs(
+    title = "Average Danceability by Release Year",
+    x = "Year",
+    y = "Mean Danceability"
+  ) +
+  theme_minimal()
+```
+Our graph shows that dancability had a steep rise in popularity in the late 40's and had similar peaks in the 1980's and 2000's.
+
+---
+
+### 4. Which decade is most represented on user playlists?
+
+The following analysis groups songs by decade to reveal which musical eras appear most frequently in user-created playlists.
+
+```{r top-decades, echo=FALSE}
+analysis_data <- analysis_data |> mutate(decade = (year %/% 10) * 10)
+
+ggplot(analysis_data, aes(x = as.factor(decade))) +
+  geom_bar(fill = "#4f8ec6") +
+  labs(
+    title = "Playlist Tracks by Decade",
+    x = "Decade",
+    y = "Number of Tracks"
+  ) +
+  theme_minimal()
+```
+It appears as though the 2010's are the most popular decade in user-created playlists.
+
+---
+
+### 5. Musical Key Distribution (Polar Plot)
+
+The musical keys exist in a natural cycle which we call the circle of fifths. The frequency of key usage will be represented through polar coordinates in a circular plot.
+
+```{r key-polar-plot, echo=FALSE}
+key_labels <- c("C", "C♯/D♭", "D", "D♯/E♭", "E", "F",
+                "F♯/G♭", "G", "G♯/A♭", "A", "A♯/B♭", "B")
+
+key_counts <- analysis_data |>
+  filter(!is.na(key)) |>
+  count(key) |>
+  mutate(label = key_labels[key + 1])  
+
+ggplot(key_counts, aes(x = factor(label, levels = key_labels), y = n)) +
+  geom_bar(stat = "identity", fill = "#f39c12") +
+  coord_polar() +
+  labs(
+    title = "Distribution of Musical Keys",
+    x = "Key",
+    y = "Track Count"
+  ) +
+  theme_minimal()
+```
+Keys such as C, C#/D♭ and G appear to be used more frequently than keys suchs as D#/E and A#/B♭. 
+
+---
+
+### 6. What Are the Most Popular Track Lengths?
+
+Do users prefer shorter songs, longer ballads, or something in between? Let’s find out by plotting track durations.
+```{r track-length-distribution, echo=FALSE}
+ggplot(analysis_data, aes(x = duration / 60000)) +
+  geom_histogram(binwidth = 0.25, fill = "#6c5ce7", color = "white") +
+  coord_cartesian(xlim = c(1, 10)) +
+  labs(
+    title = "Distribution of Track Lengths",
+    x = "Duration (Minutes)",
+    y = "Number of Tracks"
+  ) +
+  theme_minimal()
+```
+The typical track length appears to be around 3-4 minutes long.
+
+---
+
+### 7. Are Popular Songs More Danceable?
+
+Let’s compare average danceability across different popularity levels.
+```{r danceability-vs-popularity, echo=FALSE}
+ggplot(analysis_data, aes(x = popularity, y = danceability)) +
+  geom_point(alpha = 0.3, color = "#e84393") +
+  geom_smooth(method = "loess", se = FALSE, color = "#2d3436") +
+  labs(
+    title = "Danceability vs. Popularity",
+    x = "Popularity Score",
+    y = "Danceability"
+  ) +
+  theme_minimal()
+```
+The correlation between Dancability and Popularity seems to be weak and scattered.
+
+---
+
+### 8. Are Explicit Songs More Popular?
+
+Let’s compare the correlation betweenpopularity and explicitly.
+```{r explicit-vs-popularity, echo=FALSE}
+ggplot(analysis_data, aes(x = as.factor(explicit), y = popularity)) +
+  geom_boxplot(fill = "#00b894") +
+  labs(
+    title = "Popularity of Explicit vs. Non-Explicit Songs",
+    x = "Explicit",
+    y = "Popularity"
+  ) +
+  theme_minimal()
+```
+The popularity scores of explicit songs are slightly higher than those of non-explicit songs which indicates a weak relationship between explicit content and mainstream appeal.
+
+---
+
+
+```{r top-rock-60s-70s, echo=FALSE}
+#finding the most popular classic rock songs to use for task 6
+library(stringr)
+
+rock_keywords <- c("The Beatles", "The Rolling Stones", "Simon & Garfunkel", "Led Zeppelin",
+                   "Jimi Hendrix", "Pink Floyd", "Creedence Clearwater", "The Who", "David Bowie",
+                   "Fleetwood Mac", "Bob Dylan", "The Doors", "The Beach Boys", "The Byrds")
+
+top_rock_60s_70s <- analysis_data |>
+  filter(year >= 1960 & year <= 1979) |>
+  filter(str_detect(artists, str_c(rock_keywords, collapse = "|"))) |>
+  count(name, artists, sort = TRUE) |>
+  slice_max(n, n = 15)
+
+top_rock_60s_70s
+```
+
+
+## Task 6: Building a Playlist from Anchor Songs
+
+What makes a great playlist? It’s not just about individual songs, but rather it’s about flow, cohesion, and musical compatibility. To explore this, we’ll start with two anchor songs and use a mix of musical and behavioral heuristics to find tracks that complement them.
+
+For this task, we’ve chosen:
+
+- 🎸 **"Stairway to Heaven – 2012 Remaster"** by *Led Zeppelin*  
+- 🇺🇸 **"Fortunate Son"** by *Creedence Clearwater Revival*
+
+These two songs are rock classics that define a popular music sound for many people.
+
+We’ll now explore five strategies to find songs that belong alongside them.
+
+--- 
+
+### 1. Songs Commonly Found on the Same Playlists
+
+The following list shows the most frequently appearing songs on playlists that include either *Stairway to Heaven* or *Fortunate Son*. These tracks may not be musically identical, but they reflect the tastes of users who grouped them with our anchors — a strong signal of perceived compatibility.
+
+```{r set-anchors, include=FALSE}
+anchor_songs <- analysis_data |>
+  filter(name %in% c("Stairway to Heaven - 2012 Remaster", "Fortunate Son"),
+         str_detect(artists, "Led Zeppelin|Creedence Clearwater Revival"))
+```
+
+```{r co-occur, echo=FALSE}
+anchor_playlists <- analysis_data |>
+  filter(track_id %in% anchor_songs$track_id) |>
+  pull(playlist_id) |>
+  unique()
+
+co_occur_songs <- analysis_data |>
+  filter(playlist_id %in% anchor_playlists,
+         !(track_id %in% anchor_songs$track_id)) |>
+  count(name, artists, sort = TRUE) |>
+  slice_max(n, n = 10)
+
+co_occur_songs
+```
+
+---
+
+### 2. Songs in the Same Key and Tempo Range
+
+These tracks share the same musical key and tempo range as the anchor songs to create a continuous listening flow.
+
+```{r key-tempo, echo=FALSE}
+anchor_keys <- anchor_songs$key
+anchor_tempo <- anchor_songs$tempo
+
+key_tempo_match <- analysis_data |>
+  filter(key %in% anchor_keys,
+         between(tempo, min(anchor_tempo) - 5, max(anchor_tempo) + 5)) |>
+  filter(!(track_id %in% anchor_songs$track_id)) |>
+  distinct(track_id, .keep_all = TRUE) |>
+  slice_sample(n = 10)
+
+key_tempo_match |>
+  select(name, artists, key, tempo)
+```
+
+--- 
+
+### 3. Songs by the Same Artist
+
+Below is a list of Led Zeppelin or Creedence Clearwater Revival songs that match in sound and message.
+
+```{r same-artist, echo=FALSE}
+same_artist <- analysis_data |>
+  filter(str_detect(artists, "Led Zeppelin|Creedence Clearwater Revival"),
+         !(track_id %in% anchor_songs$track_id)) |>
+  distinct(track_id, .keep_all = TRUE)
+
+same_artist |>
+  select(name, artists)
+```
+
+---
+
+### 4. Songs from the Same Era with Similar Sound
+
+These songs were released in the same time period and share similar acousticness, energy, and danceability values.
+
+```{r similar-era, echo=FALSE}
+anchor_yrs <- anchor_songs$year
+anchor_avg <- anchor_songs |>
+  summarise(acousticness = mean(acousticness, na.rm=TRUE),
+            danceability = mean(danceability, na.rm=TRUE),
+            energy = mean(energy, na.rm=TRUE))
+
+feature_match <- analysis_data |>
+  filter(
+    between(year, min(anchor_yrs) - 2, max(anchor_yrs) + 2),
+    between(acousticness, anchor_avg$acousticness - 0.1, anchor_avg$acousticness + 0.1),
+    between(danceability, anchor_avg$danceability - 0.1, anchor_avg$danceability + 0.1),
+    between(energy, anchor_avg$energy - 0.1, anchor_avg$energy + 0.1)
+  ) |>
+  filter(!(track_id %in% anchor_songs$track_id)) |>
+  distinct(track_id, .keep_all = TRUE) |>
+  slice_sample(n = 10)
+
+feature_match |>
+  select(name, artists, year, acousticness, danceability, energy)
+```
+
+--- 
+
+### 5. Hidden Gems
+
+These are songs that show up frequently in playlists but don’t have high popularity scores.
+
+```{r hidden-gems, echo=FALSE, include=FALSE}
+pop_threshold <- 70
+
+hidden_gems <- analysis_data |>
+  filter(popularity < pop_threshold,
+         !(track_id %in% anchor_songs$track_id)) |>
+  count(name, track_id, artists, sort = TRUE) |>
+  slice_max(n, n = 10)
+
+hidden_gems
+```
+
+---
+
+## Task 7: Creating The Ultimate Playlist
+
+The time has arrived to construct the Ultimate Playlist from our identified candidate tracks.
+
+This assignment requires both data analysis and creative judgment. Our two anchor songs *"Stairway to Heaven"* and *"Fortunate Son"* will serve as the base for constructing a 12-track playlist which maintains musical flow and thematic coherence while featuring established tracks alongside lesser-known songs.
+
+::: {.callout-note}
+Our playlist must meet the following criteria:
+
+- at least **12 tracks**.
+
+- **2 songs that listeners have not heard before**.
+
+-  **3 songs that fail to meet our established popularity criteria**
+:::
+
+
+The playlist needs to demonstrate progression through its structure which can either ascend and descend or follow another pattern.
+
+```{r all-candidates, echo=FALSE}
+all_candidates <- bind_rows(
+  co_occur_songs,
+  key_tempo_match |> select(name, artists),
+  same_artist |> select(name, artists),
+  feature_match |> select(name, artists),
+  hidden_gems |> select(name, artists)
+) |>
+  distinct(name, artists)
+
+all_candidates
+```
+
+```{r define-playlist, echo=FALSE}
+library(tibble)
+
+my_playlist <- tribble(
+  ~name, ~artists,
+  "Hotel California - 2013 Remaster", "Eagles",
+  "House Of The Rising Sun", "The Animals",
+  "Piano Man", "Billy Joel",
+  "American Pie", "Don McLean",
+  "Free Bird", "Lynyrd Skynyrd",
+  "Kashmir - 1990 Remaster", "Led Zeppelin",
+  "Up Around The Bend", "Creedence Clearwater Revival",
+  "Immigrant Song - 2012 Remaster", "Led Zeppelin",
+  "Good Vibrations - Remastered", "The Beach Boys",
+  "The Night They Drove Old Dixie Down - Remastered 2000", "The Band",
+  "Goodbye Yellow Brick Road - Remastered 2014", "Elton John",
+  "Ain't No Sunshine", "Bill Withers"
+)
+```
+
+```{r fix-analysis-artists, include=FALSE}
+library(stringr)
+analysis_data <- analysis_data |>
+  mutate(artists = str_remove_all(artists, "\\[|\\]|'"))
+```
+
+
+```{r join-audio, include=FALSE}
+playlist_audio <- my_playlist |>
+  left_join(analysis_data, by = c("name", "artists")) |>
+  filter(!is.na(energy), !is.na(acousticness), !is.na(tempo))
+```
+
+
+```{r playlist-energy-plot, echo=FALSE}
+playlist_audio |>
+  mutate(order = row_number()) |>
+  ggplot(aes(x = reorder(name, order), y = energy)) +
+  geom_col(fill = "#2ecc71") +
+  labs(
+    title = "Energy Progression Across the Playlist",
+    x = "Track",
+    y = "Energy"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+
+## The Ultimate Playlist: *Vinyl Rock Classics*
+
+The playlist follows a chronologicalpath through rock music history by combining powerful guitar solos with meaningful lyrics and everlasting musical compositions.
+
+###  📝 Description
+
+The playlist begins with emotional masterpieces which transform into an intense storm before ending with peaceful music. The playlist unites well-known songs with lesser-known tracks to create musical unity througdifferent energetic and tonal and instrumental elements.
+
+### 🎧 Design Principles
+
+The emotional foundation of the playlist begins with “Stairway to Heaven” and “Fortunate Son.”
+
+The song arrangement follows a dynamic pattern which alternates between powerful sections and contemplative moments.
+
+The playlist features a visual representation of acoustic elements and tempo and energy levels to achieve balanced peaks and valleys.
+
+The playlist contains at  least two unknown tracks and three lesser-known songs which demonstrate that exceptional music does not need widespread popularity.
+
+ The playlist weaves a narrative that explores both the musical genre and the historical period.

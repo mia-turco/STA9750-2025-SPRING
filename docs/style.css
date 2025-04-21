@@ -1,0 +1,73 @@
+/* ==== Global Styling ==== */
+body {
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  line-height: 1.6;
+  background-color: #fefefe;
+}
+
+/* ==== Headings ==== */
+h1, h2, h3, h4 {
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+/* ==== Navigation + Footer ==== */
+.navbar, .footer {
+  border-radius: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+/* ==== Tables ==== */
+table {
+  border-radius: 8px;
+  border-collapse: separate;
+  border-spacing: 0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+  overflow: hidden;
+}
+
+table th, table td {
+  padding: 0.75em 1em;
+  border-bottom: 1px solid #dee2e6;
+}
+
+/* ==== Code Blocks ==== */
+pre, code {
+  background-color: #f6f8fa;
+  color: #2c3e50;
+  border-radius: 6px;
+  padding: 0.2em 0.4em;
+}
+
+/* ==== Details (Collapsible Code Blocks) ==== */
+details {
+  margin: 1em 0;
+  border: 1px solid #d1d5da;
+  border-radius: 6px;
+  padding: 0.75em;
+  background-color: #f8f9fa;
+}
+
+details summary {
+  font-weight: bold;
+  cursor: pointer;
+}
+
+/* ==== Links ==== */
+a {
+  color: #0275d8;
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ==== TOC Styling ==== */
+.toc {
+  background-color: #f9f9f9;
+  padding: 1em;
+  border-radius: 8px;
+}
