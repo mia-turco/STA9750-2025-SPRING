@@ -76,7 +76,7 @@ ul.task-list li input[type="checkbox"] {
   <li><a href="#hidden-gems" id="toc-hidden-gems" class="nav-link" data-scroll-target="#hidden-gems">5. Hidden Gems</a></li>
   </ul></li>
   <li><a href="#task-7-creating-the-ultimate-playlist" id="toc-task-7-creating-the-ultimate-playlist" class="nav-link" data-scroll-target="#task-7-creating-the-ultimate-playlist">Task 7: Creating The Ultimate Playlist</a></li>
-  <li><a href="#the-ultimate-playlist-rock-vinyl-classics" id="toc-the-ultimate-playlist-rock-vinyl-classics" class="nav-link" data-scroll-target="#the-ultimate-playlist-rock-vinyl-classics">The Ultimate Playlist: <em>Rock Vinyl Classics</em></a>
+  <li><a href="#the-ultimate-playlist-vinyl-rock-classics" id="toc-the-ultimate-playlist-vinyl-rock-classics" class="nav-link" data-scroll-target="#the-ultimate-playlist-vinyl-rock-classics">The Ultimate Playlist: <em>Vinyl Rock Classics</em></a>
   <ul class="collapse">
   <li><a href="#description" id="toc-description" class="nav-link" data-scroll-target="#description">📝 Description</a></li>
   <li><a href="#design-principles" id="toc-design-principles" class="nav-link" data-scroll-target="#design-principles">🎧 Design Principles</a></li>
@@ -391,18 +391,18 @@ ul.task-list li input[type="checkbox"] {
 <div class="cell">
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 10 × 4
-   name                                               artists          key tempo
-   &lt;chr&gt;                                              &lt;chr&gt;          &lt;dbl&gt; &lt;dbl&gt;
- 1 "Twenty Miles"                                     ['Deer Tick']      0 114. 
- 2 "Maybe IDK"                                        ['Jon Bellion…     9 120. 
- 3 "Fixer Upper - From \"Frozen\"/Soundtrack Version" ['Maia Wilson…     9 103. 
- 4 "Check"                                            ['Young Thug']     0 111. 
- 5 "Suffocate - Superclean"                           ['J. Holiday']     9  82.8
- 6 "Double Vision"                                    ['Foreigner']      9 130. 
- 7 "When I'm Gone"                                    ['Wiz Khalifa…     9  92.0
- 8 "The Lemon Song - 1993 Remaster"                   ['Led Zeppeli…     9  90.5
- 9 "The Big Rock Candy Mountain"                      ['Harry McCli…     0  94.5
-10 "Cell Therapy"                                     ['Goodie Mob']     0  83.1</code></pre>
+   name                            artists                             key tempo
+   &lt;chr&gt;                           &lt;chr&gt;                             &lt;dbl&gt; &lt;dbl&gt;
+ 1 Happily                         ['One Direction']                     9 117  
+ 2 All About That Bass             ['Meghan Trainor']                    9 134. 
+ 3 Bulldog Front                   ['Fugazi']                            9 135. 
+ 4 Ven Devórame Otra Vez           ['Mazz']                              9 106. 
+ 5 Gabino Barrera                  ['Mazz']                              0 104. 
+ 6 Tangled up in Blue              ['Bob Dylan']                         9 101. 
+ 7 I Don't Want This Night To End  ['Luke Bryan']                        9 112. 
+ 8 My Prerogative                  ['Bobby Brown']                       9 110. 
+ 9 All We Know (feat. Phoebe Ryan) ['The Chainsmokers', 'Phoebe Rya…     0  90  
+10 Nobody Knows                    ['The Lumineers']                     9  82.0</code></pre>
 </div>
 </div>
 <hr>
@@ -438,16 +438,16 @@ ul.task-list li input[type="checkbox"] {
 <pre><code># A tibble: 10 × 6
    name                           artists  year acousticness danceability energy
    &lt;chr&gt;                          &lt;chr&gt;   &lt;dbl&gt;        &lt;dbl&gt;        &lt;dbl&gt;  &lt;dbl&gt;
- 1 Loan Me a Dime                 ['Boz …  1969        0.309        0.392  0.471
- 2 Ain't No Sunshine              ['Bill…  1971        0.457        0.479  0.416
- 3 Contemplation                  ['McCo…  1967        0.48         0.397  0.534
- 4 Goodbye Yellow Brick Road - R… ['Elto…  1973        0.446        0.559  0.473
- 5 Somebody to Love               ['Jeff…  1967        0.408        0.504  0.578
- 6 To Sir with Love               ['Lulu…  1967        0.361        0.546  0.399
- 7 The Wind Cries Mary            ['Jimi…  1967        0.348        0.499  0.495
- 8 Get Together                   ['The …  1967        0.467        0.542  0.492
- 9 The Night They Drove Old Dixi… ['The …  1969        0.453        0.507  0.493
-10 Me and Bobby McGee             ['Jani…  1971        0.302        0.453  0.464</code></pre>
+ 1 The Wind Cries Mary            ['Jimi…  1967        0.348        0.499  0.495
+ 2 Somebody to Love               ['Jeff…  1967        0.408        0.504  0.578
+ 3 Ain't No Sunshine              ['The …  1972        0.353        0.446  0.562
+ 4 Good Vibrations - Remastered   ['The …  1967        0.326        0.396  0.473
+ 5 Me and Bobby McGee             ['Jani…  1971        0.302        0.453  0.464
+ 6 Loan Me a Dime                 ['Boz …  1969        0.309        0.392  0.471
+ 7 Cracklin' Rosie - Single Vers… ['Neil…  1970        0.319        0.562  0.503
+ 8 Goodbye Yellow Brick Road - R… ['Elto…  1973        0.446        0.559  0.473
+ 9 Witchy Woman - 2013 Remaster   ['Eagl…  1972        0.364        0.555  0.568
+10 Contemplation                  ['McCo…  1967        0.48         0.397  0.534</code></pre>
 </div>
 </div>
 <hr>
@@ -483,7 +483,7 @@ Note
 <p>The playlist needs to demonstrate progression through its structure which can either ascend and descend or follow another pattern.</p>
 <div class="cell">
 <div class="cell-output cell-output-stdout">
-<pre><code># A tibble: 71 × 2
+<pre><code># A tibble: 72 × 2
    name                             artists         
    &lt;chr&gt;                            &lt;chr&gt;           
  1 Carry on Wayward Son             ['Kansas']      
@@ -496,7 +496,7 @@ Note
  8 Piano Man                        ['Billy Joel']  
  9 Thunderstruck                    ['AC/DC']       
 10 American Pie                     ['Don McLean']  
-# ℹ 61 more rows</code></pre>
+# ℹ 62 more rows</code></pre>
 </div>
 </div>
 <div class="cell">
@@ -509,8 +509,8 @@ Note
 </div>
 </div>
 </section>
-<section id="the-ultimate-playlist-rock-vinyl-classics" class="level2">
-<h2 class="anchored" data-anchor-id="the-ultimate-playlist-rock-vinyl-classics">The Ultimate Playlist: <em>Rock Vinyl Classics</em></h2>
+<section id="the-ultimate-playlist-vinyl-rock-classics" class="level2">
+<h2 class="anchored" data-anchor-id="the-ultimate-playlist-vinyl-rock-classics">The Ultimate Playlist: <em>Vinyl Rock Classics</em></h2>
 <p>The playlist follows a chronologicalpath through rock music history by combining powerful guitar solos with meaningful lyrics and everlasting musical compositions.</p>
 <section id="description" class="level3">
 <h3 class="anchored" data-anchor-id="description">📝 Description</h3>
