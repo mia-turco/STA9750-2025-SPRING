@@ -1,0 +1,622 @@
+---
+project:
+  type: website
+  site-url: https://mia-turco.github.io/STA9750-2025-SPRING/mp04.html
+
+website:
+  title: "MP04 Final Project"
+  navbar:
+    background: primary
+    foreground: white
+    left:
+      - href: index.qmd
+        text: Home
+      - href: analysis.qmd
+        text: Analysis
+      - href: about.qmd
+        text: About
+
+format:
+  html:
+    theme: flatly
+    css: styles.css
+    toc: true
+---
+
+# Exploring Recent US Political Shifts
+
+This research project analyzes voting behavior changes between 2020 and 2024 U.S. presidential elections through data analysis at the county level. Our analysis uses web-scraped election data together with official U.S. Census shapefiles to determine areas where Donald Trump gained or lost support from 2020. Our research aims to reveal important geographic patterns and partisan shifts which exist beyond the general national election outcomes. It combines geospatial mapping with R data cleaning and exploratory analysis to identify strategic areas for both parties while providing a framework that can be applied to future election cycles.
+
+---
+
+```{r download-shapefiles, echo=FALSE}
+#Task 1: downloading and unzipping country shapefiles
+
+download.file(
+  url = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_500k.zip",
+  destfile = "data/mp04/cb_2023_us_county_500k.zip",
+  mode = "wb",
+  method = "curl"
+)
+
+unzip("data/mp04/cb_2023_us_county_500k.zip", exdir = "data/mp04")
+
+```
+
+```{r county-map, echo=FALSE, message=FALSE, warning=FALSE}
+library(sf)
+library(ggplot2)
+
+counties <- st_read("data/mp04/cb_2023_us_county_500k.shp", quiet = TRUE)
+
+ggplot(counties) +
+  geom_sf(fill = "#2c3e50", color = "white", size = 0.1) +
+  coord_sf(
+    xlim = c(-125, -66),
+    ylim = c(24, 50)
+  ) +
+  labs(title = "US County Map (2023 Census Shapefile)") +
+  theme_minimal()
+```
+<span class="text-muted">County-level boundaries from the 2023 U.S. Census shapefile, shown as a base for mapping political shifts.</span>
+
+```{r scrape-election-data, echo=FALSE, message=FALSE, warning=FALSE}
+#task 2: scraping wikipedia election results 
+scrape_st_result <- function(state_name) {
+  url_state <- str_replace_all(state_name, " ", "_")
+  wiki_path <- paste0("wiki/2024_United_States_presidential_election_in_", url_state)
+  local_file <- file.path("data/mp04", paste0("election_2024_", url_state, ".html"))
+
+  if (!file.exists(local_file)) {
+    page <- request("https://en.wikipedia.org/") |>
+      req_url_path_append(wiki_path) |>
+      req_perform()
+
+    writeBin(resp_body_raw(page), local_file)
+  }
+
+  html <- read_html(local_file)
+
+  tables <- html |>
+    html_elements("table") |>
+    html_table(fill = TRUE)
+
+  table_w_county <- tables |>
+    keep(~ any(str_detect(names(.), regex("county", ignore_case = TRUE))))
+
+  if (length(table_w_county) == 0) {
+    message(paste("No table with county column found for", state_name))
+    return(NULL)
+  }
+
+  df <- table_w_county[[1]] |>
+    clean_names() |>
+    mutate(state = state_name)
+
+  return(df)
+}
+```
+
+```{r rescrape-election-data, echo=FALSE, message=FALSE, warning=FALSE}
+# Task  3: modifying task 2 for 2020 election results
+library(httr2)
+library(rvest)
+library(dplyr)
+library(stringr)
+library(janitor)
+library(purrr)
+
+if (!dir.exists("data/mp04")) {
+  dir.create("data/mp04", recursive = TRUE)
+}
+
+scrape_st_result_2020 <- function(state_name) {
+  url_state <- str_replace_all(state_name, " ", "_")
+  wiki_path <- paste0("wiki/2020_United_States_presidential_election_in_", url_state)
+  local_file <- file.path("data/mp04", paste0("election_2020_", url_state, ".html"))
+
+  if (!file.exists(local_file)) {
+    page <- request("https://en.wikipedia.org/") |>
+      req_url_path_append(wiki_path) |>
+      req_perform()
+
+    writeBin(resp_body_raw(page), local_file)
+  }
+
+  html <- read_html(local_file)
+
+  tables <- html |>
+    html_elements("table") |>
+    html_table(fill = TRUE)
+
+  table_w_county <- tables |>
+    keep(~ any(str_detect(names(.), regex("county", ignore_case = TRUE))))
+
+  if (length(table_w_county) == 0) {
+    message(paste("No table with county column found for", state_name))
+    return(NULL)
+  }
+
+  df <- table_w_county[[1]] |>
+    clean_names() |>
+    mutate(state = state_name)
+
+  return(df)
+}
+```
+
+
+---
+
+### 2020 County-Level Results (Sample)
+
+The following table shows the 2020 presidential election results by county for New York, as scraped directly from Wikipedia. This provides a reference point for analyzing shifts in voting behavior between 2020 and 2024.
+
+```{r show-ny-table, echo=FALSE}
+library(knitr)
+biden_trump_ny <- scrape_st_result_2020("New York")
+kable(head(biden_trump_ny), caption = "Table: County-Level 2020 Presidential Results for New York")
+```
+
+
+```{r combine-election-data, echo=FALSE, message=FALSE, warning=FALSE}
+#task 4: initial analysis
+library(sf)
+library(dplyr)
+library(stringr)
+library(janitor)
+library(purrr)
+library(httr2)
+library(rvest)
+
+counties <- st_read("data/mp04/cb_2023_us_county_500k.shp", quiet = TRUE)
+
+counties_clean <- counties |>
+  mutate(county = str_to_lower(NAME), state = str_to_lower(STATE_NAME))
+
+states <- state.name
+
+results_2020 <- lapply(states, scrape_st_result_2020) |> bind_rows()
+results_2024 <- lapply(states, scrape_st_result) |> bind_rows()
+
+results_2020 <- results_2020 |>
+  clean_names() |>
+  mutate(county = str_to_lower(county), state = str_to_lower(state))
+
+results_2024 <- results_2024 |>
+  clean_names() |>
+  mutate(county = str_to_lower(county), state = str_to_lower(state))
+
+results_combined <- full_join(results_2020, results_2024, by = c("state", "county"), suffix = c("_2020", "_2024"))
+
+combined_data <- left_join(counties_clean, results_combined, by = c("state", "county"))
+
+combined_data <- combined_data |>
+  mutate(
+    trump_2020 = as.numeric(gsub(",", "", donald_trump_republican_2020)),
+    trump_2024 = as.numeric(gsub(",", "", donald_trump_republican_2024)),
+    total_2020 = as.numeric(gsub(",", "", total_2020)),
+    total_2024 = as.numeric(gsub(",", "", total_2024)),
+    pct_trump_2020 = trump_2020 / total_2020,
+    pct_trump_2024 = trump_2024 / total_2024,
+    shift = pct_trump_2024 - pct_trump_2020
+  )
+```
+
+---
+
+### 1. Which county cast the most votes for Trump (absolute) in 2024?
+The analysis begins by determining which county delivered the most votes to Donald Trump in 2024.
+
+```{r q1-trump-most-votes, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+
+trump_col <- names(results_2024)[str_detect(names(results_2024), "trump")][1]
+
+top_trump <- results_2024 |>
+  filter(!is.na(.data[[trump_col]])) |>
+  slice_max(order_by = .data[[trump_col]], n = 1) |>
+  select(State = state, County = county, Trump_Votes = !!sym(trump_col))
+
+datatable(
+  top_trump,
+  options = list(
+    paging = FALSE,
+    searching = FALSE,
+    info = FALSE
+  ),
+  class = "table table-striped table-hover table-sm"
+)
+
+```
+
+The highest number of votes Trump received occurred in Renville, North Dakota and Lyman, South Dakota with 993 votes. The voting patterns in this election followed traditional Republican voting behavior in major populous counties throughout North Dakota.
+
+### 2. Which county cast the highest fraction of votes for Biden in 2020?
+
+This question reveals which areas delivered the most significant proportion of votes to Biden during the 2020 election.
+
+```{r q2-biden-fraction-2020, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+library(stringr)
+
+biden_col <- names(results_2020)[str_detect(names(results_2020), regex("biden", ignore_case = TRUE))][1]
+total_col <- names(results_2020)[str_detect(names(results_2020), regex("total|votes", ignore_case = TRUE))][1]
+
+biden_loyal <- results_2020 |>
+  filter(!is.na(.data[[biden_col]]), !is.na(.data[[total_col]])) |>
+  mutate(
+    biden_votes = as.numeric(str_remove_all(.data[[biden_col]], "[^0-9]")),
+    total_votes = as.numeric(str_remove_all(.data[[total_col]], "[^0-9]")),
+    share = biden_votes / total_votes
+  ) |>
+  slice_max(share, n = 1) |>
+  transmute(
+    State = state,
+    County = county,
+    `Biden Vote Share (%)` = round(share * 100, 2)
+  )
+
+datatable(
+  biden_loyal,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+```
+
+The county that gave Biden the most support in 2020 was Oglala Lakota, South Dakota where he received 88.41% of the total votes. 
+
+### 3. Which county had the largest shift toward Trump (absolute votes) in 2024?
+This analysis focuses on the county which experienced the largest absolute growth in Trump votes from 2020.
+
+```{r q3-trump-surge-fix, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+library(stringr)
+
+trump_2020_col <- names(results_2020)[str_detect(names(results_2020), regex("trump", ignore_case = TRUE))][1]
+trump_2024_col <- names(results_2024)[str_detect(names(results_2024), regex("trump", ignore_case = TRUE))][1]
+
+results_2020_clean <- results_2020 |>
+  filter(
+    !is.na(county),
+    county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state),
+    state != ""
+  ) |>
+  mutate(
+    county = str_to_lower(county),
+    state = str_to_lower(state),
+    trump_2020 = as.numeric(str_remove_all(.data[[trump_2020_col]], "[^0-9]"))
+  ) |>
+  select(state, county, trump_2020)
+
+results_2024_clean <- results_2024 |>
+  filter(
+    !is.na(county),
+    county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state),
+    state != ""
+  ) |>
+  mutate(
+    county = str_to_lower(county),
+    state = str_to_lower(state),
+    trump_2024 = as.numeric(str_remove_all(.data[[trump_2024_col]], "[^0-9]"))
+  ) |>
+  select(state, county, trump_2024)
+
+trump_shift <- inner_join(results_2020_clean, results_2024_clean, by = c("state", "county")) |>
+  mutate(vote_change = trump_2024 - trump_2020) |>
+  slice_max(vote_change, n = 1) |>
+  transmute(
+    State = str_to_title(state),
+    County = str_to_title(county),
+    `Trump 2020 Votes` = trump_2020,
+    `Trump 2024 Votes` = trump_2024,
+    `Vote Increase` = vote_change
+  )
+
+datatable(
+  trump_shift,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+
+```
+
+The largest net vote gain for Trump happened in Los Angeles, California where he received 44332 more votes. The voting pattern indicates either an expanding conservative voter base or diminished opposition voter turnout in that specific region.
+
+### 4. Which state had the largest shift toward Harris (or smallest shift to Trump) in 2024?
+This analysis shows where Democratic candidate Kamala Harris maintained support while Trump's gains were minimal.
+
+```{r q4-state-harris-shift, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+library(stringr)
+
+results_2020_clean <- results_2020 |>
+  filter(
+    !is.na(county),
+    county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state),
+    state != ""
+  ) |>
+  mutate(
+    state = str_to_lower(state),
+    trump_2020 = as.numeric(str_remove_all(.data[[trump_2020_col]], "[^0-9]"))
+  ) |>
+  select(state, trump_2020)
+
+results_2024_clean <- results_2024 |>
+  filter(
+    !is.na(county),
+    county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state),
+    state != ""
+  ) |>
+  mutate(
+    state = str_to_lower(state),
+    trump_2024 = as.numeric(str_remove_all(.data[[trump_2024_col]], "[^0-9]"))
+  ) |>
+  select(state, trump_2024)
+
+state_shift <- full_join(results_2020_clean, results_2024_clean, by = "state") |>
+  group_by(state) |>
+  summarise(
+    trump_2020_total = sum(trump_2020, na.rm = TRUE),
+    trump_2024_total = sum(trump_2024, na.rm = TRUE),
+    vote_change = trump_2024_total - trump_2020_total
+  ) |>
+  slice_min(order_by = vote_change, n = 1) |>
+  transmute(
+    State = str_to_title(state),
+    `Trump 2020` = trump_2020_total,
+    `Trump 2024` = trump_2024_total,
+    `Vote Change` = vote_change
+  )
+
+datatable(
+  state_shift,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+
+```
+
+The state with the smallest shift toward Trump was Florida, where Harris retained or grew 5668731 votes relative to 2020. 
+
+### 5. What is the largest county by area?
+The relationship between geographical size and population does not always exist but it provides useful context for understanding how visualizations can misrepresent voter trends by land.
+
+```{r q5-largest-county-clean, echo=FALSE, message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+library(DT)
+
+largest_county <- counties |>
+  mutate(
+    area_km2 = as.numeric(st_area(geometry)) / 1e6,
+    state = str_to_title(STATE_NAME),
+    county = str_to_title(NAME)
+  ) |>
+  st_drop_geometry() |>  
+  select(State = state, County = county, Area_km2 = area_km2) |>
+  slice_max(Area_km2, n = 1) |>
+  mutate(`Area (km²)` = round(Area_km2, 2)) |>
+  select(State, County, `Area (km²)`)
+
+
+datatable(
+  largest_county,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+
+```
+
+The dataset shows that Yukon-Koyukuk, Alaksa covers the biggest area at 380461.938 square miles. The county's extensive size does not necessarily translate to significant voting power because land itself does not participate in elections.
+
+### 6. Which county had the highest voter density in 2020 (voters per area)?
+High voter density often reflects urban environments with greater civic infrastructure. This analysis ranks counties by total 2020 votes per unit of land area.
+
+```{r q6-voter-density-2020, echo=FALSE, message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+library(DT)
+library(stringr)
+
+total_vote_col <- names(results_2020)[str_detect(names(results_2020), regex("total|votes", ignore_case = TRUE))][1]
+
+votes_2020 <- results_2020 |>
+  filter(
+    !is.na(county),
+    county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state),
+    state != ""
+  ) |>
+  mutate(
+    county = str_to_lower(county),
+    state = str_to_lower(state),
+    total_votes = as.numeric(str_remove_all(.data[[total_vote_col]], "[^0-9]"))
+  ) |>
+  select(state, county, total_votes)
+
+county_area <- counties |>
+  mutate(
+    county = str_to_lower(NAME),
+    state = str_to_lower(STATE_NAME),
+    area_km2 = as.numeric(st_area(geometry)) / 1e6
+  ) |>
+  st_drop_geometry() |>
+  select(state, county, area_km2)
+
+voter_density <- inner_join(votes_2020, county_area, by = c("state", "county")) |>
+  filter(area_km2 > 0) |>
+  mutate(voters_per_km2 = total_votes / area_km2) |>
+  slice_max(voters_per_km2, n = 1) |>
+  transmute(
+    State = str_to_title(state),
+    County = str_to_title(county),
+    `Total Votes` = total_votes,
+    `Area (km²)` = round(area_km2, 2),
+    `Voter Density (votes/km²)` = round(voters_per_km2, 2)
+  )
+
+datatable(
+  voter_density,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+
+```
+
+The county with the highest voting density in 2020 was San Francisco, Californa with 3623.4 votes per square mile. These areas tend to lean Democratic and represent hubs of concentrated political activity.
+
+### 7. Which county had the largest increase in voter turnout in 2024?
+The shift in voter turnout serves as a powerful indicator of political enthusiasm. This analysis focuses on determining which county experienced the most significant rise in total ballots between 2020 and 2024.
+
+```{r q7-turnout-surge, echo=FALSE, message=FALSE, warning=FALSE}
+library(dplyr)
+library(DT)
+library(stringr)
+
+total_2020_col <- names(results_2020)[str_detect(names(results_2020), regex("total|votes", ignore_case = TRUE))][1]
+total_2024_col <- names(results_2024)[str_detect(names(results_2024), regex("total|votes", ignore_case = TRUE))][1]
+
+votes_2020 <- results_2020 |>
+  filter(
+    !is.na(county), county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state), state != ""
+  ) |>
+  mutate(
+    state = str_to_lower(state),
+    county = str_to_lower(county),
+    total_2020 = as.numeric(str_remove_all(.data[[total_2020_col]], "[^0-9]"))
+  ) |>
+  select(state, county, total_2020)
+
+votes_2024 <- results_2024 |>
+  filter(
+    !is.na(county), county != "",
+    !str_detect(county, regex("total|statewide|overall", ignore_case = TRUE)),
+    !is.na(state), state != ""
+  ) |>
+  mutate(
+    state = str_to_lower(state),
+    county = str_to_lower(county),
+    total_2024 = as.numeric(str_remove_all(.data[[total_2024_col]], "[^0-9]"))
+  ) |>
+  select(state, county, total_2024)
+
+turnout_change <- inner_join(votes_2020, votes_2024, by = c("state", "county")) |>
+  mutate(
+    turnout_diff = total_2024 - total_2020
+  ) |>
+  slice_max(turnout_diff, n = 1) |>
+  transmute(
+    State = str_to_title(state),
+    County = str_to_title(county),
+    `2020 Votes` = total_2020,
+    `2024 Votes` = total_2024,
+    `Increase in Turnout` = turnout_diff
+  )
+
+datatable(
+  turnout_change,
+  options = list(paging = FALSE, searching = FALSE, info = FALSE),
+  class = "table table-striped table-hover table-sm",
+  rownames = FALSE
+)
+
+```
+
+
+The largest voter turnout increase happened in Montgomery, Texas where total votes rose by 35715. The increase in voter turnout could stem from fresh voter engagement initiatives or local matters that motivated citizens to participate.
+
+---
+
+```{r alakska-hawaii, echo=FALSE, message=FALSE, warning=FALSE}
+#shifting alaska and hawaii
+transform_ak_hi <- function(sf_obj) {
+  sf_proj <- st_transform(sf_obj, 2163)
+
+  alaska <- sf_proj[sf_proj$STATE_NAME == "Alaska", ]
+  hawaii <- sf_proj[sf_proj$STATE_NAME == "Hawaii", ]
+  mainland <- sf_proj[!(sf_proj$STATE_NAME %in% c("Alaska", "Hawaii")), ]
+
+  bind_rows(mainland, alaska, hawaii)
+}
+
+```
+
+## Our County Shift Map
+
+The map below shows how Donald Trump received different levels of support in each county during the 2020 and 2024 presidential elections. The direction of each arrow shows the voting shift while longer redder arrows indicate counties where Trump received the greatest vote share increase. The analysis uses Wikipedia election pages that were scraped and combined with official county shapefiles from the U.S. Census Bureau. The map reveals local partisan trends through vote percentage changes rather than raw vote counts which helps identify emerging patterns that state-level results might hide.
+
+```{r task-5, echo=FALSE, message=FALSE, warning=FALSE}
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(viridis)
+
+counties_transformed <- transform_ak_hi(counties_clean)
+
+
+counties_merged <- left_join(
+  counties_transformed,
+  combined_data |> st_drop_geometry() |> select(state, county, shift),
+  by = c("state", "county")
+)
+
+
+counties_with_shift <- counties_merged |> filter(!is.na(shift) & !st_is_empty(geometry))
+centroids <- st_centroid(counties_with_shift)
+
+arrow_data <- as_tibble(st_coordinates(centroids), .name_repair = ~ c("X", "Y")) |>
+  mutate(
+    shift = counties_with_shift$shift,
+    xend = X + 5 * shift,
+    yend = Y
+  )
+
+ggplot() +
+  geom_sf(data = counties_merged, fill = "gray95", color = "white", linewidth = 0.1) +
+  geom_segment(
+    data = arrow_data,
+    aes(x = X, y = Y, xend = xend, yend = yend, color = shift),
+    arrow = arrow(length = unit(0.08, "inches")),
+    linewidth = 0.3, alpha = 0.8
+  ) +
+  scale_color_gradient2(
+    low = "blue", mid = "white", high = "red", midpoint = 0,
+    name = "Shift to Trump"
+  ) +
+  coord_sf(
+  crs = st_crs(2163),
+  xlim = c(-2500000, 2500000),
+  ylim = c(-2000000, 1200000),
+  expand = FALSE
+) +
+  labs(title = "County-Level Shift Toward Trump from 2020 to 2024") +
+  theme_void() +
+  theme(
+    legend.position = "right",
+    plot.title = element_text(size = 16, face = "bold", hjust = 0.5)
+  )
+
+```
+
+The visualization shows that Trump gained the most votes in the South and Midwest and parts of the rural West with Texas Alabama and Tennessee showing the most significant growth. The rightward movement in some counties from traditionally blue or swing regions is not consistent across the entire country. The non-uniform pattern indicates Trump's 2024 strategy involved strengthening his base in established strongholds instead of building new alliances which will affect future campaign strategies and party platforms.
