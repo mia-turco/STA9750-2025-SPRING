@@ -30,13 +30,14 @@ This research project analyzes voting behavior changes between 2020 and 2024 U.S
 ---
 
 ```{r download-shapefiles, echo=FALSE}
-#Task 1: downloading and unzipping country shapefiles
+dir.create("data/mp04", recursive = TRUE, showWarnings = FALSE)
+
+options(timeout = 300)  
 
 download.file(
   url = "https://www2.census.gov/geo/tiger/GENZ2023/shp/cb_2023_us_county_500k.zip",
   destfile = "data/mp04/cb_2023_us_county_500k.zip",
-  mode = "wb",
-  method = "curl"
+  mode = "wb"
 )
 
 unzip("data/mp04/cb_2023_us_county_500k.zip", exdir = "data/mp04")
@@ -58,7 +59,8 @@ ggplot(counties) +
   labs(title = "US County Map (2023 Census Shapefile)") +
   theme_minimal()
 ```
-<span class="text-muted">County-level boundaries from the 2023 U.S. Census shapefile, shown as a base for mapping political shifts.</span>
+
+[County-level boundaries from the 2023 U.S. Census shapefile, shown as a base for mapping political shifts.]{.text-muted}
 
 ```{r scrape-election-data, echo=FALSE, message=FALSE, warning=FALSE}
 #task 2: scraping wikipedia election results 
@@ -145,10 +147,9 @@ scrape_st_result_2020 <- function(state_name) {
 }
 ```
 
-
 ---
 
-### 2020 County-Level Results (Sample)
+### 2020 County-Level Results 
 
 The following table shows the 2020 presidential election results by county for New York, as scraped directly from Wikipedia. This provides a reference point for analyzing shifts in voting behavior between 2020 and 2024.
 
@@ -157,7 +158,6 @@ library(knitr)
 biden_trump_ny <- scrape_st_result_2020("New York")
 kable(head(biden_trump_ny), caption = "Table: County-Level 2020 Presidential Results for New York")
 ```
-
 
 ```{r combine-election-data, echo=FALSE, message=FALSE, warning=FALSE}
 #task 4: initial analysis
@@ -206,6 +206,7 @@ combined_data <- combined_data |>
 ---
 
 ### 1. Which county cast the most votes for Trump (absolute) in 2024?
+
 Our analysis begins by determining which county delivered the most votes to Donald Trump in 2024.
 
 ```{r q1-trump-most-votes, echo=FALSE, message=FALSE, warning=FALSE}
@@ -267,9 +268,10 @@ datatable(
 )
 ```
 
-The county that gave Biden the most support in 2020 was Oglala Lakota, South Dakota where he received 88.41% of the total votes. 
+The county that gave Biden the most support in 2020 was Oglala Lakota, South Dakota where he received 88.41% of the total votes.
 
 ### 3. Which county had the largest shift toward Trump (absolute votes) in 2024?
+
 This analysis focuses on the county which experienced the largest absolute growth in Trump votes from 2020.
 
 ```{r q3-trump-surge-fix, echo=FALSE, message=FALSE, warning=FALSE}
@@ -333,6 +335,7 @@ datatable(
 The largest net vote gain for Trump happened in Los Angeles, California where he received 44332 more votes. The voting pattern indicates either an expanding conservative voter base or diminished opposition voter turnout in that specific region.
 
 ### 4. Which state had the largest shift toward Harris (or smallest shift to Trump) in 2024?
+
 This analysis shows where Democratic candidate Kamala Harris maintained support while Trump's gains were minimal.
 
 ```{r q4-state-harris-shift, echo=FALSE, message=FALSE, warning=FALSE}
@@ -392,9 +395,10 @@ datatable(
 
 ```
 
-The state with the smallest shift toward Trump was Florida, where Harris retained or grew 5668731 votes relative to 2020. 
+The state with the smallest shift toward Trump was Florida, where Harris retained or grew 5668731 votes relative to 2020.
 
 ### 5. What is the largest county by area?
+
 The relationship between geographical size and population does not always exist but it provides useful context for understanding how visualizations can misrepresent voter trends by land.
 
 ```{r q5-largest-county-clean, echo=FALSE, message=FALSE, warning=FALSE}
@@ -427,6 +431,7 @@ datatable(
 The dataset shows that Yukon-Koyukuk, Alaksa covers the biggest area at 380461.938 square miles. The county's extensive size does not necessarily translate to significant voting power because land itself does not participate in elections.
 
 ### 6. Which county had the highest voter density in 2020 (voters per area)?
+
 High voter density often reflects urban environments with greater civic infrastructure. This analysis ranks counties by total 2020 votes per unit of land area.
 
 ```{r q6-voter-density-2020, echo=FALSE, message=FALSE, warning=FALSE}
@@ -485,6 +490,7 @@ datatable(
 The county with the highest voting density in 2020 was San Francisco, Californa with 3623.4 votes per square mile. These areas tend to lean Democratic and represent hubs of concentrated political activity.
 
 ### 7. Which county had the largest increase in voter turnout in 2024?
+
 The shift in voter turnout serves as a powerful indicator of political enthusiasm. This analysis focuses on determining which county experienced the most significant rise in total ballots between 2020 and 2024.
 
 ```{r q7-turnout-surge, echo=FALSE, message=FALSE, warning=FALSE}
@@ -542,7 +548,6 @@ datatable(
 )
 
 ```
-
 
 The largest voter turnout increase happened in Montgomery, Texas where total votes rose by 35715. The increase in voter turnout could stem from fresh voter engagement initiatives or local matters that motivated citizens to participate.
 
