@@ -1,6 +1,7 @@
 ---
 project:
   type: website
+  output-dir: docs
   site-url: https://mia-turco.github.io/STA9750-2025-SPRING/mp04.html
 
 website:
