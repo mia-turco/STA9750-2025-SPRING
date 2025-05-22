@@ -1,0 +1,121 @@
+---
+website:
+  title: "Group Report"
+  navbar:
+    background: dark
+    foreground: white
+    left:
+      - href: index.qmd
+        text: Home
+      - href: analysis.qmd
+        text: Analysis
+      - href: about.qmd
+        text: About
+
+format:
+  html:
+    theme: litera
+    toc: true
+---
+
+# Intro:
+Our project focuses on the following broad question: What do box office patterns reveal about the evolving movie industry, and how can budgeting strategies, release timing, and audience taste shape a film's success?
+
+In the rapidly changing entertainment industry, traditional methods of creating successful films are becoming increasingly difficult to determine. Analyzing factors that lead to successful box office performance beyond star power and visual effects helps studios, producers, and distributors make data-based decisions.
+
+Several studies have attempted to unravel these dynamics. A study by UC Davis titled "Can Movie Reviews Predict Box Office Success?" demonstrated that positive pre-release reviews on Rotten Tomatoes often create an inverse relationship with box office revenue since they decrease mass market appeal. According to research published in the National Library of Medicine titled "Do Critical Reviews Affect Box Office Revenues Through Community Engagement and User Reviews?", critical reviews influence box office success directly and indirectly through enhanced user-generated content and increased community engagement.
+
+We collected data from two primary industry sources to study these trends:
+IMDb supplied film metadata through its database, which contained information about titles and release dates, genres, and domestic gross revenue.
+
+The Numbers database delivered information about production budgets, marketing estimates, and release timing periods.
+
+Merging these datasets posed several challenges. Budget information was unavailable for specific movies, so we needed to perform manual entry cleaning or filtering for those cases. The process of matching titles between platforms becomes complex because of different formatting systems and diverse genre classification methods. Standardizing genres into three broad categories (Action, Comedy, Animation) enabled us to make more reliable comparisons.
+
+Our analysis began with developing a foundational base to answer the three essential research questions.
+
+What financial strategies applied to a film production influence its box office performance?
+
+The timing when a movie reaches audiences impacts its commercial achievements.
+
+Audience preferences together with genre trends demonstrate patterns of evolution throughout the years.
+
+These research questions aim to describe previous outcomes and provide guidance for upcoming production strategies. Each section presents visualizations, statistical summaries, and practical implications that support the following focus areas.
+
+---
+
+## A Risk and ROI Perspective
+In the business of filmmaking, budgets represent strategic investments, not just expenses. One of our core goals was to explore how production budgets influence financial outcomes and whether there is a measurable return on investment (ROI) trend that studios can rely on.
+Using a cleaned dataset of over 5,000 films, we compared production budgets with domestic box office gross using regression analysis. As expected, our model revealed a statistically significant positive relationship between budget and gross:
+F-value: 6593
+
+
+p-value: < 0.001
+
+
+R²: Moderate, indicating budget explains part of the variability in box office performance.
+
+
+But when we examined the distribution and spread of data points, an important pattern emerged: budget amplifies potential, but also increases risk. High-budget films show a wider range of outcomes — some achieving enormous box office success, others underperforming dramatically. This suggests that while spending more can unlock bigger earnings, it also exposes studios to greater financial volatility.
+To better capture this dynamic, we created a budget-to-revenue ratio to estimate rough ROI. Our findings indicate:
+Low-to-mid-budget films (under $30M) often delivered the highest ROI, especially in genres like horror, comedy, and character-driven drama.
+
+
+Blockbuster-scale films ($100M+) had the largest absolute revenues but more uneven ROI, as their break-even thresholds are much higher.
+
+
+This points to a key industry insight: massive spending is not always the most efficient path to profitability. Instead, financial success often lies in finding the sweet spot—matching investment level to audience expectations, genre norms, and marketing strategy.
+This ROI perspective reshapes how we think about budgeting. It’s not just about how much money a film makes, but how well it performs relative to what it costs. A $200 million film that grosses $500 million may look impressive, but it may underperform next to a $10 million film that earns $60 million. In this context, efficiency matters as much as scale.
+In conclusion, our first finding emphasizes that budgets are a strategic risk tool, not just a cost center. Studios that approach budgeting as a balancing act between opportunity and exposure—not merely as a path to box office size—are better positioned to sustain long-term profitability. Success lies in the smart use of budget, not just in the size of the spend.
+—
+
+
+## Budget and Box Office Performance: 
+This project investigates how well movie production budgets can forecast their box office success. After cleaning the data, we gathered more than 5,000 film entries with budget and gross revenue information from The Numbers database.
+To analyze the relationship, we developed a scatter plot that displayed budget data on the x-axis and box office gross data on the y-axis. A simple linear regression model was applied to establish the correlation between the variables. The visual pattern showed that movies with higher production budgets generated greater box office earnings. The data points showed wide variation, which indicated that budget does not serve as a reliable guarantee for success.
+The regression analysis produced statistically significant results because the ANOVA F-value reached 6593 and the p-value remained below 0.001, which confirmed a strong connection between budget and gross. The R² value indicated that the budget explains part of the box office performance, yet multiple factors influence the outcome. Large budgets tend to match with high box office earnings, but successful low-budget movies succeed through their appeal to specific audiences, release timing, critical reception, and marketing approaches.
+The research evidence supports the conclusion that budgeting is an important yet insufficient factor for predicting financial outcomes. The film industry demonstrates high variability because it contains both unsuccessful high-budget productions and successful low-budget releases, which demonstrate the market's intricate nature.
+
+--- 
+
+## Release Time and Audience Taste Change
+Our research reveals that summer months (June–July) and holidays (November–December) consistently take the top spots in average box office gross year in and year out. Using domestic gross and release date data supplied by The Numbers, we calculated average monthly grosses and discovered pronounced peaks during those months. These are not coincidences. They fit within anticipated audience activity: school's out during the summer, and family groups desire entertainment on holiday weekends. Studios take advantage of this by releasing blockbusters, sequels, and family movies at those moments when audiences are most available.
+This awareness emphasizes that the timing of release is not just a logistical matter, but a strategic matter. Those released in peak-traffic times get more publicity and news coverage. However, timing also involves facing competition; a mid-budget drama will lose if pitted against blockbuster franchise films. On the other hand, good counterprogramming can make niche films succeed by offering service to underserved niches during peak weekend crowds.
+We then examined audience preference and how the relative popularity of genres has changed over time. Using enhanced metadata through the OMDb API, we tracked the proportion of all box office gross by genre from 2000 to 2024.
+Our findings show a substantial spike in franchise-dense genres: namely, Action, Adventure, and Fantasy. These genres now capture significant annual box office earnings, reflecting the theatrical marketplace's shift towards high-budget, experiential, and visually focused storytelling.
+Other genres, including Drama, Comedy, and Romance, which for so long were the mainstay of theatrical output, have not fared as well. Most of these movies today thrive on streaming platforms, where lower budgets and script-centric stories are more supportive of in-home consumption.
+To quantify how concentrated the market has become, we calculated the Gini coefficient of genre shares each year. A rising Gini index confirms that box office gross is becoming more concentrated in a smaller number of genres. This is a function of changing audience patterns and studio tactics: rising production costs and risk aversion compel studios to bet larger on broad-appeal, PG-13-rated content built for sequels and spin-offs.
+
+--- 
+
+# Conclusion:
+This project examined how box office trends reveal changes in the movie business. We examined how budgeting methods, release timing, and audience preferences impact movie box office profits. Our multifaceted study revealed several significant findings.
+
+## Summary of Key Findings
+Budget emerges as the main factor determining movie success in this analysis. The statistical analysis of thousands of films established a direct link between production budget and box office earnings. Higher-budget films produce higher box office earnings, although the connection remains non-definitive.
+The movie industry demonstrates success through multiple factors. The final results heavily depend on three factors, which include genre, release timing, and audience targeting methods. Our investigation revealed that studios focus on fewer genres through longer films while prioritizing PG-13 content to maximize audience demographics. The market shows that visually immersive genres, including action, animation, and fantasy, demonstrate consistent profitability.
+
+## Limitations
+This project had several limitations that restricted its full potential because of the following:
+
+The absence of marketing expenditure data is a significant limitation in this study.
+
+The current market requires considering streaming platforms alongside traditional box office gross because these platforms have become vital to movie profitability. This study failed to consider streaming success metrics because they have become crucial for evaluating modern movie success.
+
+The process of genre classification shows both subjective and inconsistent approaches. Standardizing genres remained challenging because major categories contained diverse tonal and structural elements and audience reception.
+
+Our analysis focused primarily on U.S. box office revenue but did not include international markets. Films' financial performance depends heavily on international markets because China, Europe, and Latin America now generate substantial studio revenue and alter box office outcomes.
+
+## Proposals for Future Work
+Future research should explore these promising directions:
+
+The research benefits from integrating marketing expenses and worldwide box office statistics to explain success patterns across multiple markets better.
+
+Random forests, together with gradient boosting models and ensemble models, can detect hidden non-linear patterns that standard regression models fail to identify.
+
+The addition of review data from Rotten Tomatoes and Metacritic enables researchers to determine if positive or negative reviews affect how budget, genre, and release timing influence box office performance.
+
+Different genres operate under separate economic principles that influence their financial behavior. Horror films achieve good investment returns through low-budget production, while animation requires a higher initial investment to produce prolonged financial gains. Models that specialize in each genre would enable studios to generate more accurate predictions about their productions.
+
+The film industry's evolution has brought new elements that determine box office success. The industry now relies on audience trends, platform changes, marketing approaches, and cultural timing factors as much as budget considerations. The research establishes a data-driven model to understand these factors, which creates evidence-based decision pathways for future development.
+

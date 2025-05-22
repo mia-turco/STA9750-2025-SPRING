@@ -1,0 +1,116 @@
+---
+website:
+  title: "Project Contribution Summary"
+  navbar:
+    background: dark
+    foreground: white
+    left:
+      - href: index.qmd
+        text: Home
+      - href: analysis.qmd
+        text: Analysis
+      - href: about.qmd
+        text: About
+
+format:
+  html:
+    theme: united
+    toc: true
+---
+
+# Overview 
+
+This project examined how different elements of movies affect their financial outcomes by studying the connection between production costs and box office revenue. Our research team investigated whether budget along with genre and runtime and release date could function as indicators for commercial success.
+
+I focused on examining the relationship between film budgets and their resulting box office earnings. The analysis required me to find and prepare suitable data sources while building statistical models and creating visual representations of important findings and interpreting statistical data. I performed analytic work while leading team meetings and assisting with slide development before delivering the final presentation with the team.
+
+
+## Data Sourcing and Preperation
+
+The first step in the analysis required finding a dataset which contained both budget information and box office revenue data. The initial plan to scrape data from Box Office Mojo and The Numbers websites shifted to using a precompiled dataset which included thousands of films with their corresponding metadata. The selection of this dataset helped us reduce time consumption and prevented structural inconsistencies between different information sources.
+
+The dataset arrived as a zipped CSV file. The code I wrote performed the unzipping operation before directly loading the data into R. The raw data contained multiple variables that included movie name alongside genre and release date and IMDb score and budget and gross revenue and production company.
+
+The dataset needed extensive cleaning because it presented numerical values as text through inconsistent formatting which included commas and scientific notation. The gsub() function together with type conversion tools helped me transform the budget and gross revenue variables for analysis purposes. I checked the data quality by matching specific entries against IMDb and Box Office Mojo records.
+
+
+## Exploratory Analysis
+
+The cleaned data required me to create a scatter plot that showed how movie budgets affect box office returns. The data points in the scatter plot showed a positive relationship between movie budgets and box office revenue. The relationship between budget and revenue showed a non-linear pattern with many outliers because some low-budget films achieved high returns while some high-budget films failed to generate profits.
+
+The analysis used box office revenue as the outcome variable and budget as the independent variable in a linear regression model. The ANOVA table and regression coefficients showed that budget acted as a statistically significant predictor of earnings (p < 0.001) and the F-value indicated a strong model fit. The R-squared value indicated that budget alone did not explain box office success because it was far from 1. The results indicate that budget plays a role in success but it is not the only factor in the complex equation.
+
+
+## Presentation Contributions
+
+I maintained organizational responsibilities and handled most of the communication tasks during the project. I scheduled our weekly team meetings and monitored deliverables while acting as the main contact for instructor expectations clarification. I helped the team create the slide deck by focusing on the “Findings” and “Limitations” sections.
+
+I presented the budget vs. earnings analysis section during the final presentation. I described the research approach before showing the visualization and then analyzed the main results. I answered questions from both the professor and peers regarding the meaning of outliers and possible model enhancements.
+
+
+## Visual Output 
+
+The following plot illustrates the relationship between budget and box office revenue. The plot was created using ggplot2, with the code hidden on the final website but included in the source file for reproducibility.
+
+```{r budget-vs-boxoffice, echo=FALSE, message=FALSE, warning=FALSE}
+#unzippping the files from kaggle
+zip_path <- "/Users/miaturco/Desktop/movies.csv (1).zip"
+unzip(zip_path, exdir = "/Users/miaturco/Desktop/movies")
+list.files("/Users/miaturco/Desktop/movies")
+
+movies <- read.csv("/Users/miaturco/Desktop/movies/movies.csv")
+
+library(ggplot2)
+library(dplyr)
+
+# filtering and cleaning the data
+movie_clean <- movies |> 
+  filter(!is.na(budget), !is.na(gross), budget > 0, gross > 0)
+
+# creating a scatter plot
+ggplot(movie_clean, aes(x = budget, y = gross)) +
+  geom_point(alpha = 0.6, color = "steelblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "darkred") +
+  scale_x_continuous(labels = scales::label_dollar(scale = 1e-6, suffix = "M")) +
+  scale_y_continuous(labels = scales::label_dollar(scale = 1e-6, suffix = "M")) +
+  labs(
+    title = "Relationship Between Movie Budget and Gross Earnings",
+    x = "Budget (USD)", y = "Gross Revenue (USD)"
+  ) +
+  theme_minimal()
+
+#creating an ANOVA table
+model <- lm(gross ~ budget, data = movie_clean)
+anova(model)
+```
+
+### Interpretation of Results
+
+The ANOVA table regression results showed that budget has a statistically significant relationship with box office gross. The F-value was extremely large, and the p-value was effectively zero. The results strongly indicate that budget is a determining factor for movie revenue generation.
+
+The scatter plot together with residual patterns showed that budget is not the only determining factor. The box office success of Paranormal Activity and The Blair Witch Project exceeded expectations despite their minimal production costs yet major studio films with large budgets failed to generate profits. The data confirms that success depends on multiple factors because high production costs do not ensure financial success.
+
+
+## Challenges and Solutions
+
+Some of the main challenges included:
+
+- The analysis was complicated by missing or malformed data because several entries contained invalid budget or gross figures which I addressed by removing NA values before modeling.
+
+- The budget and gross figures showed such large differences that I considered using a log scale transformation but decided to keep the original values for better interpretability.
+
+- Removing outliers to enhance model precision but decided to maintain them because they depict crucial real-world events (e.g., viral hits).
+
+
+## Additional Contributions
+
+My technical and organizational duties were supplemented by my work to improve the research question of our project. I recommended that our team develop particular hypotheses for each section which could be "higher budgets lead to higher earnings" or "action films outperform others during summer months." The presentation gained both structure and clarity from this approach.
+
+I proposed that future research should examine how marketing spend and release strategy interact with budget to impact performance in the "Future Work" section. I proposed random forest models and genre-specific regressions as potential methods for future research development.
+
+
+# Reflections
+
+The work on this project helped me develop my abilities in data cleaning and modeling as well as communication. I acquired practical skills for working with actual data while dealing with disorganized formats and creating straightforward statistical findings. The experience taught me to understand that not every significant variable provides the complete explanation.
+
+I developed better skills for team-based work under time constraints while coordinating between technical and non-technical team members. The process of organizing and presenting our findings was a meaningful professional experience, and I believe the project provided valuable insight into the intersection of media analytics and business forecasting.
