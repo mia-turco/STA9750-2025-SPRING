@@ -1,6 +1,6 @@
 ---
 website:
-  title: "Project Contribution Summary"
+  title: "Individual Report"
   navbar:
     background: dark
     foreground: white
